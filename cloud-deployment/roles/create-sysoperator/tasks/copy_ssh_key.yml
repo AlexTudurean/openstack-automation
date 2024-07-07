@@ -1,0 +1,17 @@
+# create sysoperator ssh directory
+- name: Create sysoperator ssh directory
+  file:
+    path: "/home/sysoperator/.ssh"
+    state: directory
+    owner: sysoperator
+    group: wheel
+    mode: '0700'
+
+# copy ssh key to sysoperator
+- name: Copy ssh key to sysoperator
+  copy:
+    src: "{{ lookup('env', 'HOME') + '/.ssh/id_rsa.pub' }}"
+    dest: "/home/sysoperator/.ssh/authorized_keys"
+    owner: sysoperator
+    group: wheel
+    mode: '0600'

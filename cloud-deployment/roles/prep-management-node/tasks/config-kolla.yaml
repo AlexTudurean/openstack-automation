@@ -1,0 +1,74 @@
+- name: Config Kolla
+  vars:
+    ansible_python_interpreter: "{{ venv_wrapper }}"
+  block:
+  - name: Generate Kolla passwords
+    command: kolla-genpwd
+    args:
+      chdir: /etc/kolla
+    tags: [config-globals]
+
+  - name: Copy globals.yaml file to /etc/kolla
+    copy:
+      src: "{{ playbook_dir }}/roles/prep-management-node/files/globals.yml"
+      dest: /etc/kolla
+    tags: [config-globals]
+
+  # Create the /etc/kolla/config directory hierarchy
+  - name: Create /etc/kolla/config directory
+    file:
+      path: "{{ item }}"
+      state: directory
+    loop: "{{ config_dirs }}"
+
+  # Create the keyring files
+  - name: Create keyring temp files
+    vars:
+      client_name: "{{ item.split('/')[-1].split('.')[2] }}"
+      client_keyring_temp_file: "{{ item }}" 
+    include_tasks: "{{ playbook_dir }}/roles/prep-management-node/tasks/create-keyring-files.yaml"
+    loop: "{{ ceph_keyring_temp_files }}"
+
+  - name: Copy keyring files to /etc/kolla/config
+    vars:
+      client_name: "{{ item.split('/')[-1].split('.')[2] }}"
+      client_keyring_temp_file: "/tmp/ceph-keyrings/ceph.client.{{ client_name }}.keyring"
+    copy: 
+      src: "{{ client_keyring_temp_file }}"
+      dest: "{{ item }}"
+    loop: "{{ ceph_keyring_files }}"
+
+  # Create the ceph.conf files
+  - name: Get ceph cluster fsid file
+    slurp:
+      src: "/tmp/ceph_fsid"
+    register: ceph_conf_file
+
+  - name: Extract ceph cluster fsid
+    set_fact:
+      ceph_fsid: "{{ ceph_conf_file['content'] | b64decode | regex_replace('\n', '') }}"
+    when: ceph_conf_file['content'] is defined
+    
+  - name: Create temp ceph.conf file
+    template:
+      src: "{{ playbook_dir }}/roles/prep-management-node/templates/ceph.conf.j2"
+      dest: "/tmp/ceph.conf"
+  
+  - name: Add newline at the end of the ceph.conf file
+    lineinfile:
+      dest: "/tmp/ceph.conf"
+      line: ""
+  
+  - name: Copy ceph.conf files to /etc/kolla/config
+    copy:
+      src: "/tmp/ceph.conf"
+      dest: "{{ item }}"
+    loop: "{{ ceph_conf_files }}"
+  
+
+  
+
+
+
+    
+  

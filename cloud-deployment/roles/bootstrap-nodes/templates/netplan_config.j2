@@ -1,0 +1,34 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+{% for interface in ethernets %}
+    {{ interface.link }}:
+      addresses: {{ interface.addresses }}
+      routes:
+{% for route in interface.routes %}
+        - to: {{ route.to }}
+          via: {{ route.via }}
+{% endfor %}
+{% if interface.nameservers is defined %}
+      nameservers:
+        addresses: {{ interface.nameservers.addresses }}
+{% endif %}
+{% endfor %}
+  vlans:
+{% for vlan in vlans %}
+    {{ vlan.link }}.{{ vlan.vlan_id }}:
+      id: {{ vlan.vlan_id }}
+      link: {{ vlan.link }}
+      mtu: {{ vlan.mtu }}
+{% if vlan.addresses is defined %}
+      addresses: {{ vlan.addresses }}
+{% endif %}
+{% if vlan.routes is defined %}
+{% for route in vlan.routes %}
+      routes:
+        - to: {{ route.to }}
+          via: "{{ route.via }}"
+{% endfor %}
+{% endif %}
+{% endfor %}

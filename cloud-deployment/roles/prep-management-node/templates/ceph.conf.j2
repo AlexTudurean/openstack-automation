@@ -1,0 +1,7 @@
+[global]
+fsid = {{ ceph_fsid }}
+mon_initial_members = {{ mon_initial_members | join(',') }}
+mon_host = {{ mon_hosts | join(',') }}
+auth_cluster_required = cephx
+auth_service_required = cephx
+auth_client_required = cephx

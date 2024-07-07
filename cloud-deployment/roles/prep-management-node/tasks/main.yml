@@ -1,0 +1,12 @@
+---
+# tasks file for prep-management-node
+- include_tasks: install-dependencies.yaml
+  tags: [install-dependencies]
+- include_tasks: create-venv.yaml
+  tags: [create-venv]
+- include_tasks: install-kolla-ansible.yaml
+  tags: [install-kolla-ansible]
+- include_tasks: config-kolla.yaml
+  tags: [config-kolla]
+- include_tasks: deploy-kolla-ansible.yaml
+  tags: [deploy-kolla-ansible]

@@ -1,0 +1,3 @@
+[submodule "cloud-deployment/cloud-deployment/k3s-ansible"]
+	path = cloud-deployment/cloud-deployment/k3s-ansible
+	url = https://github.com/k3s-io/k3s-ansible.git

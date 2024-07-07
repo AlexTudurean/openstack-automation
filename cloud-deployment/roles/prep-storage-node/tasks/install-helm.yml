@@ -1,0 +1,31 @@
+- name: Install helm if not exists
+  vars: 
+    helm_download_url: https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+  shell: |
+    curl -fsSL -o get_helm.sh {{ helm_download_url }}
+    chmod 700 get_helm.sh
+    ./get_helm.sh
+  args:
+    chdir: /tmp
+  become: yes
+  become_user: root
+  register: helm_install_output
+- name: Print helm install output
+  debug:
+    var: helm_install_output
+- name: Add helm to PATH
+  command:
+    cmd: "ln -s /usr/local/bin/helm /usr/bin/helm"
+    creates: /usr/bin/helm
+  become: yes
+  become_user: root
+  when: helm_install_output.changed
+- name: Print helm version
+  command:
+    cmd: "helm version"
+  become: yes
+  become_user: root
+  register: helm_version_output
+- name: Print helm version output
+  debug:
+    var: helm_version_output

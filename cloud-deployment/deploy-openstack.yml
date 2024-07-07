@@ -1,0 +1,17 @@
+- name: Prepare storage
+  hosts: storage
+  gather_facts: true
+  vars:
+    ansible_user: sysoperator
+    ansible_ssh_pass: sysoperator
+    ansible_become_pass: sysoperator
+  roles:
+    - role: prep-storage-node
+
+- name: Prepare management node
+  hosts: localhost # management
+  gather_facts: true
+  vars:
+    ansible_user: root
+  roles:
+    - role: prep-management-node

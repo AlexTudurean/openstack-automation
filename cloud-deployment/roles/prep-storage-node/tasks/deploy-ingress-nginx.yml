@@ -1,0 +1,25 @@
+# Add helm repo for ingress-nginx
+- name: Add helm repo for ingress-nginx
+  vars:
+    helm_chart_url: https://kubernetes.github.io/ingress-nginx
+  kubernetes.core.helm_repository:
+    name: ingress-nginx
+    url: "{{ helm_chart_url }}"
+
+# Install ingress-nginx
+- name: Install ingress-nginx
+  kubernetes.core.helm:
+    name: ingress-nginx
+    chart_ref: ingress-nginx/ingress-nginx
+    release_namespace: ingress-nginx
+    create_namespace: true
+    state: present
+    wait: yes
+    wait_timeout: "300s"
+    update_repo_cache: yes
+  register: ingress_nginx_install_output
+
+# Print ingress-nginx install output
+- name: Print ingress-nginx install output
+  debug:
+    var: ingress_nginx_install_output

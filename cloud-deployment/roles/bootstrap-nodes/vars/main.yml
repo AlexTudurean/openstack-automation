@@ -1,0 +1,9 @@
+---
+# vars file for bootstrap-nodes
+hosts:
+  - ip: 10.0.1.2
+    hostname: controller
+  - ip: 10.0.1.3
+    hostname: compute
+  - ip: 10.0.1.4
+    hostname: storage

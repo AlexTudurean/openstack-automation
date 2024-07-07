@@ -1,0 +1,27 @@
+ethernets:
+  - link: 'enp5s0'
+    addresses: ['65.21.19.148/32', '2a01:4f9:3071:1aee::2/64']
+    routes:
+      - to: '0.0.0.0/0'
+        via: '65.21.19.129'
+      - to: 'default'
+        via: 'fe80::1'
+    nameservers:
+      addresses: ['185.12.64.1', '2a01:4ff:ff00::add:2', '185.12.64.2', '2a01:4ff:ff00::add:1']
+
+vlans:
+  - vlan_id: 4000 # management
+    link: 'enp5s0'
+    addresses: ['10.0.1.2/24']
+    mtu: 1400
+    routes: 
+      - to: '10.0.0.0/16'
+        via: '10.0.1.1'
+  - vlan_id: 4001 # services
+    link: 'enp5s0'
+    mtu: 1400
+    addresses: ['10.0.2.2/24']
+  - vlan_id: 4002 # storage
+    link: 'enp5s0'
+    mtu: 1400
+    addresses: ['10.0.3.2/24']

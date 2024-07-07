@@ -1,0 +1,8 @@
+---
+# tasks file for prep_nodes
+- include_tasks: update_hosts.yaml
+  tags: [ update_hosts ]
+- include_tasks: netplan_config.yaml
+  tags: [ config_network ]
+- include_tasks: ping.yaml
+  tags: [ ping ]

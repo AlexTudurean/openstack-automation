@@ -1,0 +1,14 @@
+- name: Ping
+  block:
+    - name: Ping node
+      ansible.builtin.ping:
+  tags:
+    - ping
+    
+- name: List files in netplan directory
+  ansible.builtin.command: ls -l /etc/netplan/
+  register: ls_output
+
+- name: Show ls output
+  ansible.builtin.debug:
+    var: ls_output.stdout

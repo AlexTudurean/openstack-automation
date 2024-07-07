@@ -1,0 +1,25 @@
+---
+- name: Get client key
+  slurp:
+    src: "{{ client_keyring_temp_file }}"
+  register: keyring_file
+
+- name: Extract key from keyring file
+  set_fact:
+    client_key: "{{ keyring_file['content'] | b64decode }}"
+  when: keyring_file['content'] is defined
+
+- name: Create keyring file
+  template:
+    src: keyring.j2
+    dest: "{{ client_keyring_temp_file }}"
+    owner: root
+    group: root
+    mode: 0600
+    force: yes
+  when: client_key is defined
+
+- name: Add newline at the end of the keyring file
+  lineinfile:
+    dest: "{{ client_keyring_temp_file }}"
+    line: ""

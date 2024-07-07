@@ -1,0 +1,116 @@
+# Prepare ceph for use in the OpenStack cloud
+- name: Install python deps
+  pip:
+    name: kubernetes
+
+- name: Get the ceph-toolbox pod name
+  kubernetes.core.k8s_info:
+    namespace: rook-ceph
+    kind: pod
+    label_selectors:
+      - app=rook-ceph-tools
+  register: ceph_toolbox_pod
+
+- name: Create ceph pools
+  kubernetes.core.k8s_exec:
+    namespace: rook-ceph
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: ceph osd pool create {{ item }}
+  loop: "{{ ceph_pools }}"
+
+- name: Init ceph rbd
+  kubernetes.core.k8s_exec:
+    namespace: rook-ceph
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: rbd pool init {{ item }}
+  loop: "{{ ceph_pools }}"
+
+- name: Create cephx authentication
+  block:
+    - name: Glance cephx authentication
+      kubernetes.core.k8s_exec:
+        namespace: rook-ceph
+        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+        command: ceph auth get-or-create client.glance mon 'profile rbd' osd 'profile rbd pool=images' mgr 'profile rbd pool=images'
+
+    - name: Cinder cephx authentication
+      kubernetes.core.k8s_exec:
+        namespace: rook-ceph
+        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+        command: ceph auth get-or-create client.cinder mon 'profile rbd' osd 'profile rbd pool=volumes, profile rbd pool=vms, profile rbd-read-only pool=images' mgr 'profile rbd pool=volumes, profile rbd pool=vms' 
+
+    - name: Cinder-bakcup cephx authentication
+      kubernetes.core.k8s_exec:
+        namespace: rook-ceph
+        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+        command: ceph auth get-or-create client.cinder-backup mon 'profile rbd' osd 'profile rbd pool=backups' mgr 'profile rbd pool=backups'
+    
+    - name: Nova cephx authentication
+      kubernetes.core.k8s_exec:
+        namespace: rook-ceph
+        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+        command: ceph auth get-or-create client.nova
+
+# Create keyrings for each component and copy the results to files on the management node
+- name: Create keyrings
+  block:
+    - name: Glance keyring
+      kubernetes.core.k8s_exec:
+        namespace: rook-ceph
+        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+        command: ceph auth get-key client.glance
+      register: glance_keyring
+
+    - name: Cinder keyring
+      kubernetes.core.k8s_exec:
+        namespace: rook-ceph
+        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+        command: ceph auth get-key client.cinder
+      register: cinder_keyring
+
+    - name: Cinder-backup keyring
+      kubernetes.core.k8s_exec:
+        namespace: rook-ceph
+        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+        command: ceph auth get-key client.cinder-backup
+      register: cinder_backup_keyring
+    
+    - name: Nova keyring
+      kubernetes.core.k8s_exec:
+        namespace: rook-ceph
+        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+        command: ceph auth get-key client.nova
+      register: nova_keyring
+
+    - name: Create local tmp keyrings directory
+      file:
+        path: /tmp/ceph-keyrings
+        state: directory
+      delegate_to: localhost
+
+    - name: Copy keyrings to management node
+      copy:
+        content: "{{ item.stdout }}"
+        dest: "/tmp/ceph-keyrings/{{ item.item }}"
+      with_items:
+        - { item: "ceph.client.glance.keyring", stdout: "{{ glance_keyring.stdout }}" }
+        - { item: "ceph.client.cinder.keyring", stdout: "{{ cinder_keyring.stdout }}" }
+        - { item: "ceph.client.cinder-backup.keyring", stdout: "{{ cinder_backup_keyring.stdout }}" }
+        - { item: "ceph.client.nova.keyring", stdout: "{{ nova_keyring.stdout }}" }
+      throttle: 1
+      delegate_to: localhost
+
+- name: Get ceph cluster fsid
+  block:
+    - name: Get ceph cluster fsid
+      kubernetes.core.k8s_exec:
+        namespace: rook-ceph
+        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+        command: ceph fsid
+      register: ceph_fsid
+
+    - name: Copy ceph fsid to management node
+      copy:
+        content: "{{ ceph_fsid.stdout }}"
+        dest: "/tmp/ceph_fsid"
+      delegate_to: localhost

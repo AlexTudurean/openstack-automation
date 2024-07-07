@@ -1,0 +1,23 @@
+- name: Deploy OpenStack using Kolla Ansible
+  vars:
+    ansible_python_interpreter: "{{ venv_wrapper }}"
+  block:
+    - name: Bootstrap servers
+      command: kolla-ansible -i /etc/kolla/inventory bootstrap-servers
+    
+    - name: Prechecks
+      command: kolla-ansible -i /etc/kolla/inventory prechecks
+
+    - name: Deploy Kolla
+      command: kolla-ansible -i /etc/kolla/inventory deploy
+
+    - name: Install OpenStack CLI client
+      command: pip install python-openstackclient -c https://releases.openstack.org/constraints/upper/2023.2
+    
+    - name: Run post-deploy
+      command: kolla-ansible post-deploy
+    
+    - name: Run init-runonce
+      command: ./share/kolla-ansible/init-runonce
+      args:
+        chdir: /opt/venv/kolla

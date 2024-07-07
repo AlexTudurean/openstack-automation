@@ -1,0 +1,9 @@
+- name: Ensure that hosts are defined in /etc/hosts
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "{{ item.ip }} {{ item.hostname }}"
+    state: present
+    create: no  # Do not create the file if it does not exist.
+    regexp: '^{{ item.ip }}\s+{{ item.hostname }}$'  # This regexp helps to ensure idempotency
+  loop: "{{ hosts }}"

@@ -1,0 +1,18 @@
+- name: Create sysoperator user
+  hosts: all
+  gather_facts: true
+  vars:
+    ansible_user: root
+    ansible_ssh_private_key_file: ~/.ssh/tudu
+  roles:
+    - role: create-sysoperator
+
+- name: Configure Servers
+  hosts: all
+  gather_facts: true
+  vars:
+    ansible_user: sysoperator
+    ansible_ssh_pass: sysoperator
+    ansible_become_pass: sysoperator
+  roles:
+    - role: bootstrap-nodes

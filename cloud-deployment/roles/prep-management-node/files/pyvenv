@@ -1,0 +1,6 @@
+#!/bin/bash
+KOLLA_VENV_DIR=/opt/venv/kolla
+
+# kolla venv wrapper
+source ${KOLLA_VENV_DIR}/bin/activate
+python $@

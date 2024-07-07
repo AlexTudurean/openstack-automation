@@ -1,0 +1,23 @@
+- name: Configure Netplan
+  become: true
+  become_method: sudo
+  block:
+    - name: Find node interfaces
+      set_fact:
+        network_interfaces: "{{ ansible_interfaces | reject('match', '^lo$|^bond.*|^tap.*|^qv.*|^br*') | list }}"
+
+    - name: Show ansible interfaces
+      debug:
+        msg: "{{ network_interfaces }}"
+
+    - name: Push Netplan template
+      template:
+        src: netplan_config.j2
+        dest: /etc/netplan/cloud-netplan.yaml
+        owner: root
+        group: root
+        mode: 0600
+      notify: apply netplan
+
+  tags: 
+    - config_network

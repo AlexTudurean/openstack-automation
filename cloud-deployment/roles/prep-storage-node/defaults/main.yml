@@ -1,0 +1,3 @@
+---
+# defaults file for prep-storage-node
+ceph_pools: ["volumes", "images", "backups", "vms"]

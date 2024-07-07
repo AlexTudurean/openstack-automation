@@ -1,0 +1,6 @@
+---
+# tasks file for create-sysoperator
+- include_tasks: create_sysoperator.yml
+  tags: [ create_sysoperator ]
+- include_tasks: copy_ssh_key.yml
+  tags: [ copy_ssh_key ]

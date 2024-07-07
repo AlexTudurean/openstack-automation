@@ -1,0 +1,10 @@
+---
+# tasks file for prep-storage-node
+- include_tasks: install-helm.yml
+  tags: [ install_helm ]
+- include_tasks: deploy-ingress-nginx.yml
+  tags: [ deploy_ingress_nginx ]
+- include_tasks: deploy-rook.yml
+  tags: [ deploy_rook ]
+- include_tasks: prepare-ceph.yml
+  tags: [ prepare_ceph ]

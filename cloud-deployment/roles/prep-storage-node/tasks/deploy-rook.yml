@@ -1,0 +1,65 @@
+# Deploy rook operator
+- name: Deploying rook
+  vars:
+    rook_namespace: rook-ceph
+    rook_repo_url: https://charts.rook.io/release
+    rook_repo: rook-release
+    rook_operator_chart: rook-ceph
+    rook_cluster_chart: rook-ceph-cluster
+  block:
+    - name: Add helm repo for rook operator
+      kubernetes.core.helm_repository:
+        name: rook-release
+        url: "{{ rook_repo_url }}"
+
+    - name: Install rook operator
+      kubernetes.core.helm:
+        name: "{{ rook_operator_chart }}"
+        chart_ref: "{{ rook_repo }}/{{ rook_operator_chart }}"
+        release_namespace: "{{ rook_namespace }}"
+        create_namespace: true
+        state: present
+        wait: yes
+        wait_timeout: 300s
+        update_repo_cache: yes
+      register: rook_operator_install_output
+
+    - name: Print rook operator install output
+      debug:
+        var: rook_operator_install_output
+
+    - name: Copy rook cluster values file
+      copy:
+        src: "{{ playbook_dir }}/roles/prep-storage-node/files/rook-cluster-values.yaml"
+        dest: /tmp/rook-cluster-values.yaml
+
+    - name: Install rook cluster
+      kubernetes.core.helm:
+        name: "{{ rook_cluster_chart }}"
+        chart_ref: "{{ rook_repo }}/{{ rook_cluster_chart }}"
+        release_namespace: "{{ rook_namespace }}"
+        create_namespace: true
+        values_files:
+          - /tmp/rook-cluster-values.yaml
+        state: present
+        wait: yes
+        wait_timeout: 300s
+      register: rook_cluster_install_output
+    
+    - name: Wait for cephcluster to be ready
+      kubernetes.core.k8s_info:
+        api_version: ceph.rook.io/v1
+        kind: CephCluster
+        namespace: "{{ rook_namespace }}"
+        name: rook-ceph
+        wait: yes
+        wait_timeout: 300
+        wait_condition: 
+          type: Ready
+      register: ceph_cluster_info
+
+    - name: Print rook cluster install output
+      debug:
+        var: rook_cluster_install_output
+  tags: 
+    - rook

@@ -13,9 +13,7 @@
   template:
     src: keyring.j2
     dest: "{{ client_keyring_temp_file }}"
-    owner: root
-    group: root
-    mode: 0600
+    mode: 0644
     force: yes
   when: client_key is defined
 

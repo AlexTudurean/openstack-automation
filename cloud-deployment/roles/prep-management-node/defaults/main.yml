@@ -3,7 +3,8 @@
 kolla_ansible_repo: "git+https://opendev.org/openstack/kolla-ansible@master"
 deps: [python3-dev, libffi-dev, gcc, libssl-dev]
 venv_deps: [python3-venv]
-venv_wrapper: "/opt/venv/kolla/bin/pyvenv"
+venv_wrapper: "{{ ansible_env.HOME }}/kolla-venv/bin/pyvenv"
+venv_path: "{{ ansible_env.HOME }}/kolla-venv"
 
 config_dirs:
   - "/etc/kolla/config"

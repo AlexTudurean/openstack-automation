@@ -1,7 +1,9 @@
 # Prepare ceph for use in the OpenStack cloud
 - name: Install python deps
-  pip:
-    name: kubernetes
+  apt:
+    name: python3-kubernetes
+    state: present
+  become: true
 
 - name: Get the ceph-toolbox pod name
   kubernetes.core.k8s_info:

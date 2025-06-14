@@ -7,7 +7,7 @@
     ./get_helm.sh
   args:
     chdir: /tmp
-  become: yes
+  become: true
   become_user: root
   register: helm_install_output
 - name: Print helm install output
@@ -17,13 +17,13 @@
   command:
     cmd: "ln -s /usr/local/bin/helm /usr/bin/helm"
     creates: /usr/bin/helm
-  become: yes
+  become: true
   become_user: root
   when: helm_install_output.changed
 - name: Print helm version
   command:
     cmd: "helm version"
-  become: yes
+  become: true
   become_user: root
   register: helm_version_output
 - name: Print helm version output

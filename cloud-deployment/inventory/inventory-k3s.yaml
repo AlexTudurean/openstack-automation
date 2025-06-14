@@ -3,11 +3,11 @@ k3s_cluster:
   children:
     server:
       hosts:
-        10.0.1.4:
+        10.1.0.196:
     agent:
       hosts:
-        10.0.1.3:
-        10.0.1.2:
+        10.1.0.194:
+        10.1.0.195:
 
   # Required Vars
   vars:
@@ -23,7 +23,7 @@ k3s_cluster:
     # You can use ansible-vault to encrypt this value / keep it secret.
     token: "WynR5Maoj0pkPOXhguq707NQOEvJRwe8Xjk0pxyzfu95qhtAYXO2bFEkM8OmrUQJ0KMYxipW8PW0rcsyfYJmxw=="
     api_endpoint: "{{ hostvars[groups['server'][0]]['ansible_host'] | default(groups['server'][0]) }}"
-    extra_server_args: "--disable=traefik --node-external-ip=10.0.1.4 --node-ip=10.0.1.4"
+    extra_server_args: "--disable=traefik --node-external-ip=10.1.0.196 --node-ip=10.1.0.196"
     extra_agent_args: ""
 
     # Optional vars

@@ -16,8 +16,8 @@ kubeVersion:
 configOverride: |
   [global]
   mon_allow_pool_delete = true
-  osd_pool_default_size = 1
-  osd_pool_default_min_size = 1
+  osd_pool_default_size = 3
+  osd_pool_default_min_size = 2
 
 # Installs a debugging toolbox deployment
 toolbox:
@@ -179,12 +179,12 @@ cephClusterSpec:
     provider: "host"
     addressRanges:
       public:
-        - "10.0.1.0/24"
+        - "10.1.0.0/24"
       cluster:
-        - "10.0.3.0/24"
+        - "192.168.200.0/24"
     selectors:
-      public: "enp5s0.4000" # management network (ik i shouldn't use it but eh its oke)
-      cluster: "enp5s0.4002" # storage network
+      public: "ens18" # management network (ik i shouldn't use it but eh its oke)
+      cluster: "ens20" # storage network
         
   #   # EXPERIMENTAL: enable the Multus network provider
   #   provider: multus

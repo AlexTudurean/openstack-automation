@@ -6,12 +6,14 @@
     command: kolla-genpwd
     args:
       chdir: /etc/kolla
+    become: true
     tags: [config-globals]
 
   - name: Copy globals.yaml file to /etc/kolla
     copy:
       src: "{{ playbook_dir }}/roles/prep-management-node/files/globals.yml"
       dest: /etc/kolla
+    become: true
     tags: [config-globals]
 
   # Create the /etc/kolla/config directory hierarchy
@@ -20,6 +22,7 @@
       path: "{{ item }}"
       state: directory
     loop: "{{ config_dirs }}"
+    become: true
 
   # Create the keyring files
   - name: Create keyring temp files
@@ -37,6 +40,7 @@
       src: "{{ client_keyring_temp_file }}"
       dest: "{{ item }}"
     loop: "{{ ceph_keyring_files }}"
+    become: true
 
   # Create the ceph.conf files
   - name: Get ceph cluster fsid file
@@ -52,23 +56,31 @@
   - name: Create temp ceph.conf file
     template:
       src: "{{ playbook_dir }}/roles/prep-management-node/templates/ceph.conf.j2"
-      dest: "/tmp/ceph.conf"
+      dest: "{{ ansible_env.HOME }}/ceph.conf"
   
   - name: Add newline at the end of the ceph.conf file
     lineinfile:
-      dest: "/tmp/ceph.conf"
+      dest: "{{ ansible_env.HOME }}/ceph.conf"
       line: ""
   
   - name: Copy ceph.conf files to /etc/kolla/config
     copy:
-      src: "/tmp/ceph.conf"
+      src: "{{ ansible_env.HOME }}/ceph.conf"
       dest: "{{ item }}"
     loop: "{{ ceph_conf_files }}"
-  
+    become: true
 
-  
+  - name: Set permissions on kolla configuration files for tudu user
+    file:
+      path: /etc/kolla
+      owner: tudu
+      group: tudu
+      recurse: yes
+    become: true
 
 
 
-    
-  
+
+
+
+

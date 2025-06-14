@@ -2,6 +2,6 @@
 # handlers file for bootstrap-nodes
 
 - name: apply netplan
-  become: yes 
+  become: true
   ansible.builtin.command:
     cmd: netplan apply 

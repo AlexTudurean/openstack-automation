@@ -1,7 +1,7 @@
 [all:vars]
-become= yes
-ansible_user= sysoperator
-ask_become_pass= sysoperator
+become=true
+ansible_user=sysoperator
+ask_become_pass=sysoperator
 
 # These initial groups are the only groups required to be modified. The
 # additional groups are for more control of the environment.
@@ -293,6 +293,9 @@ neutron
 [neutron-ovn-metadata-agent:children]
 compute
 network
+
+[nova-metadata:children]
+neutron
 
 [neutron-bgp-dragent:children]
 neutron

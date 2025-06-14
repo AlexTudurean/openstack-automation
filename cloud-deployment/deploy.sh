@@ -4,8 +4,9 @@
 ansible-playbook -i inventory/inventory.ini bootstrap-nodes.yml 
 
 # Deploy k3s
-cd k3s-ansible
-ansible-playbook playbooks/site.yml -i inventory.yml
+cp inventory/inventory-k3s.yaml cloud-deployment/k3s-ansible/inventory.yml
+cd cloud-deployment/k3s-ansible
+ansible-playbook -i inventory.yml playbooks/site.yml
 
 # Deploy openstack
 cd ../

@@ -6,23 +6,26 @@
     - name: Install kolla-ansible
       command: pip install {{ kolla_ansible_repo }}
       args:
-        chdir: /opt/venv/kolla
+        chdir: "{{ venv_path }}"
 
     - name: Create kolla-ansible configuration directory
       file: 
         path: /etc/kolla
         state: directory
+      become: true
 
     - name: Copy kolla-ansible configuration files
       copy:
-        src: /opt/venv/kolla/share/kolla-ansible/etc_examples/kolla/
+        src: "{{ venv_path }}/share/kolla-ansible/etc_examples/kolla/"
         dest: /etc/kolla
         remote_src: yes
+      become: true
 
     - name: Copy kolla-ansible inventory file
       copy:
         src: "{{ playbook_dir }}/roles/prep-management-node/files/multinode"
         dest: /etc/kolla/inventory
+      become: true
 
     - name: Install Ansible Galaxy requirements
       command: kolla-ansible install-deps

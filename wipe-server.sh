@@ -4,4 +4,4 @@
 
 rm -rf /var/lib/rook
 
-wipefs -af /dev/nvme0n1
+wipefs -af /dev/sdb

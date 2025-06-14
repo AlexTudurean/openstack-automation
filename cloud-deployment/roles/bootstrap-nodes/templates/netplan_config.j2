@@ -5,16 +5,19 @@ network:
 {% for interface in ethernets %}
     {{ interface.link }}:
       addresses: {{ interface.addresses }}
+{% if interface.routes is defined %}
       routes:
 {% for route in interface.routes %}
         - to: {{ route.to }}
           via: {{ route.via }}
 {% endfor %}
+{% endif %}
 {% if interface.nameservers is defined %}
       nameservers:
         addresses: {{ interface.nameservers.addresses }}
 {% endif %}
 {% endfor %}
+{% if vlans is defined %}
   vlans:
 {% for vlan in vlans %}
     {{ vlan.link }}.{{ vlan.vlan_id }}:
@@ -25,10 +28,11 @@ network:
       addresses: {{ vlan.addresses }}
 {% endif %}
 {% if vlan.routes is defined %}
-{% for route in vlan.routes %}
       routes:
+{% for route in vlan.routes %}
         - to: {{ route.to }}
           via: "{{ route.via }}"
 {% endfor %}
 {% endif %}
 {% endfor %}
+{% endif %}

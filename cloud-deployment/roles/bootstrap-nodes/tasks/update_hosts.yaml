@@ -1,5 +1,5 @@
 - name: Ensure that hosts are defined in /etc/hosts
-  become: yes
+  become: true
   ansible.builtin.lineinfile:
     path: /etc/hosts
     line: "{{ item.ip }} {{ item.hostname }}"

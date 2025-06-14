@@ -3,21 +3,21 @@
     ansible_python_interpreter: "{{ venv_wrapper }}"
   block:
     - name: Bootstrap servers
-      command: kolla-ansible -i /etc/kolla/inventory bootstrap-servers
+      command: kolla-ansible bootstrap-servers -i /etc/kolla/inventory
     
     - name: Prechecks
-      command: kolla-ansible -i /etc/kolla/inventory prechecks
+      command: kolla-ansible prechecks -i /etc/kolla/inventory
 
     - name: Deploy Kolla
-      command: kolla-ansible -i /etc/kolla/inventory deploy
+      command: kolla-ansible deploy -i /etc/kolla/inventory
 
     - name: Install OpenStack CLI client
       command: pip install python-openstackclient -c https://releases.openstack.org/constraints/upper/2023.2
     
     - name: Run post-deploy
-      command: kolla-ansible post-deploy
+      command: kolla-ansible post-deploy -i /etc/kolla/inventory
     
     - name: Run init-runonce
       command: ./share/kolla-ansible/init-runonce
       args:
-        chdir: /opt/venv/kolla
+        chdir: "{{ venv_path }}"

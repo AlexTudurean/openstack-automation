@@ -9,5 +9,5 @@ cd cloud-deployment/k3s-ansible
 ansible-playbook -i inventory.yml playbooks/site.yml
 
 # Deploy openstack
-cd ../
+cd ../../
 ansible-playbook -i inventory/inventory.ini deploy-openstack.yml

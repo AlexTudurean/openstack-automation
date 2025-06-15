@@ -18,7 +18,7 @@ ceph_keyring_files:
   - "/etc/kolla/config/cinder/cinder-backup/ceph.client.cinder-backup.keyring"
   - "/etc/kolla/config/cinder/cinder-backup/ceph.client.cinder.keyring"
   - "/etc/kolla/config/cinder/cinder-volume/ceph.client.cinder.keyring"
-  - "/etc/kolla/config/glance/ceph.client.glance.keyring"
+  - "/etc/kolla/config/glance/ceph.clientko   .glance.keyring"
   - "/etc/kolla/config/nova/ceph.client.nova.keyring"
   - "/etc/kolla/config/nova/ceph.client.cinder.keyring"
 

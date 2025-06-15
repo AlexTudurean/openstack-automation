@@ -12,7 +12,7 @@
       command: kolla-ansible deploy -i /etc/kolla/inventory
 
     - name: Install OpenStack CLI client
-      command: pip install python-openstackclient -c https://releases.openstack.org/constraints/upper/2023.2
+      command: pip install python-openstackclient
     
     - name: Run post-deploy
       command: kolla-ansible post-deploy -i /etc/kolla/inventory

@@ -8,3 +8,8 @@ There's a bunch of configs to change in the Ansible roles (either in vars or fil
 
 This is the network architecture I used, but you can change it to match yours:
 ![image](https://github.com/AlexTudurean/openstack-automation/assets/44097593/4f0e80c3-d63e-4a16-a185-ae67e57a17fc)
+
+
+Am sa pun aici prostiile:
+- [x] neaparat pip de pus pe storage + pachetul kubernetes, bubuie face ca toti dracii - FIXED: Added install-python-deps.yml task
+- [x] handle mai bun la openstack ca e un jeg - da, rabbitmq trebuie sa dureze 12 minute, jeg de openstack

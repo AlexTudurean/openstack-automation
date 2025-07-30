@@ -1,5 +1,7 @@
 ---
 # tasks file for prep-storage-node
+- include_tasks: install-python-deps-venv.yml
+  tags: [ install_python_deps ]
 - include_tasks: install-helm.yml
   tags: [ install_helm ]
 - include_tasks: deploy-ingress-nginx.yml

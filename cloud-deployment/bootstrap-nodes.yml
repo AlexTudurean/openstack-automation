@@ -1,13 +1,7 @@
-- name: Create sysoperator user
+---
+- name: Bootstrap nodes
   hosts: all
   gather_facts: true
   become: true
   roles:
-    - role: create-sysoperator
-
-- name: Configure Servers
-  hosts: all
-  gather_facts: true
-  become: true
-  roles:
-    - role: bootstrap-nodes
+    - role: bootstrap_nodes

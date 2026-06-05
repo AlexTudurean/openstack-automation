@@ -1,0 +1,20 @@
+---
+- name: Create sysoperator user
+  ansible.builtin.import_tasks: create_sysoperator.yml
+  tags: [create_sysoperator]
+
+- name: Copy SSH key
+  ansible.builtin.import_tasks: copy_ssh_key.yml
+  tags: [copy_ssh_key]
+
+- name: Update /etc/hosts
+  ansible.builtin.import_tasks: update_hosts.yml
+  tags: [update_hosts]
+
+- name: Configure network interfaces
+  ansible.builtin.import_tasks: netplan_config.yml
+  tags: [config_network]
+
+- name: Test connectivity
+  ansible.builtin.import_tasks: ping.yml
+  tags: [ping]

@@ -1,0 +1,8 @@
+---
+galaxy_info:
+  author: George-Alexandru Tudurean
+  description: Install kolla-ansible and ansible-core into a Python venv on the management node
+  license: MIT
+  min_ansible_version: "2.17"
+  galaxy_tags: []
+dependencies: []

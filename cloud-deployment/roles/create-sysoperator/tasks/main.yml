@@ -1,6 +1,0 @@
----
-# tasks file for create-sysoperator
-- import_tasks: create_sysoperator.yml
-  tags: [ create_sysoperator ]
-- import_tasks: copy_ssh_key.yml
-  tags: [ copy_ssh_key ]

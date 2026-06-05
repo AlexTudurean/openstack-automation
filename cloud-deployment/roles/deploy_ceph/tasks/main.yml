@@ -1,0 +1,16 @@
+---
+- name: Install Helm
+  ansible.builtin.import_tasks: install_helm.yml
+  tags: [install_helm]
+
+- name: Deploy ingress-nginx
+  ansible.builtin.import_tasks: deploy_ingress_nginx.yml
+  tags: [deploy_ingress_nginx]
+
+- name: Deploy Rook Ceph
+  ansible.builtin.import_tasks: deploy_rook.yml
+  tags: [deploy_rook]
+
+- name: Prepare Ceph for OpenStack
+  ansible.builtin.import_tasks: prepare_ceph.yml
+  tags: [prepare_ceph]

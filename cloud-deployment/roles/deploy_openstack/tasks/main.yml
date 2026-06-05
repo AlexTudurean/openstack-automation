@@ -1,0 +1,8 @@
+---
+- name: Configure Kolla
+  ansible.builtin.import_tasks: configure_kolla.yml
+  tags: [configure_kolla]
+
+- name: Deploy OpenStack
+  ansible.builtin.import_tasks: deploy_kolla.yml
+  tags: [deploy_kolla]

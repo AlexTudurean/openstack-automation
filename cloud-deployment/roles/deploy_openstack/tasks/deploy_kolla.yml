@@ -1,0 +1,60 @@
+---
+- name: Bootstrap servers
+  vars:
+    ansible_python_interpreter: "{{ venv_wrapper }}"
+  ansible.builtin.command: >
+    {{ kolla_venv_path }}/bin/kolla-ansible bootstrap-servers
+    -i /etc/kolla/inventory --use-test-images
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  changed_when: true
+  tags: [kolla_bootstrap]
+
+- name: Run prechecks
+  vars:
+    ansible_python_interpreter: "{{ venv_wrapper }}"
+  ansible.builtin.command: >
+    {{ kolla_venv_path }}/bin/kolla-ansible prechecks
+    -i /etc/kolla/inventory --use-test-images
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  changed_when: false
+  tags: [kolla_prechecks]
+
+- name: Deploy OpenStack containers
+  vars:
+    ansible_python_interpreter: "{{ venv_wrapper }}"
+  ansible.builtin.command: >
+    {{ kolla_venv_path }}/bin/kolla-ansible deploy
+    -i /etc/kolla/inventory --use-test-images
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  changed_when: true
+  tags: [kolla_deploy]
+
+- name: Install OpenStack CLI client
+  vars:
+    ansible_python_interpreter: "{{ venv_wrapper }}"
+  ansible.builtin.command: >
+    {{ kolla_venv_path }}/bin/pip install python-openstackclient
+    -c https://releases.openstack.org/constraints/upper/{{ openstack_release }}
+  changed_when: false
+  tags: [kolla_post]
+
+- name: Run post-deploy
+  vars:
+    ansible_python_interpreter: "{{ venv_wrapper }}"
+  ansible.builtin.command: "{{ kolla_venv_path }}/bin/kolla-ansible post-deploy"
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  changed_when: true
+  tags: [kolla_post]
+
+- name: Run init-runonce
+  vars:
+    ansible_python_interpreter: "{{ venv_wrapper }}"
+  ansible.builtin.command: "{{ kolla_venv_path }}/share/kolla-ansible/init-runonce"
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  changed_when: true
+  tags: [kolla_init]

@@ -1,8 +1,0 @@
----
-# tasks file for prep_nodes
-- import_tasks: update_hosts.yaml
-  tags: [ update_hosts ]
-- import_tasks: netplan_config.yaml
-  tags: [ config_network ]
-- import_tasks: ping.yaml
-  tags: [ ping ]

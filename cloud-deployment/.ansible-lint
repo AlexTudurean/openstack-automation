@@ -1,0 +1,6 @@
+exclude_paths:
+  - cloud-deployment/k3s-ansible/
+  - roles/deploy_openstack/files/globals.yml
+
+skip_list:
+  - var-naming[no-role-prefix]

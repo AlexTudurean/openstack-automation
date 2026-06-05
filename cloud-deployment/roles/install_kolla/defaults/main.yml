@@ -1,0 +1,7 @@
+---
+openstack_release: "2026.1"
+kolla_ansible_repo: "git+https://opendev.org/openstack/kolla-ansible@stable/{{ openstack_release }}"
+kolla_venv_path: "/opt/venv/kolla"
+deps: [python3-dev, libffi-dev, gcc, libssl-dev]
+venv_deps: [python3-venv]
+venv_wrapper: "{{ kolla_venv_path }}/bin/pyvenv"

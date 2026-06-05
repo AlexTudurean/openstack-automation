@@ -1,0 +1,12 @@
+---
+- name: Install OS dependencies
+  ansible.builtin.import_tasks: install_dependencies.yml
+  tags: [install_dependencies]
+
+- name: Create Python virtual environment
+  ansible.builtin.import_tasks: create_venv.yml
+  tags: [create_venv]
+
+- name: Install kolla-ansible into venv
+  ansible.builtin.import_tasks: install_kolla_ansible.yml
+  tags: [install_kolla_ansible]

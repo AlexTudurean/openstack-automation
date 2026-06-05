@@ -1,0 +1,30 @@
+---
+openstack_release: "2026.1"
+kolla_venv_path: "/opt/venv/kolla"
+venv_wrapper: "{{ kolla_venv_path }}/bin/pyvenv"
+
+config_dirs:
+  - "/etc/kolla/config"
+  - "/etc/kolla/config/cinder"
+  - "/etc/kolla/config/cinder/cinder-backup"
+  - "/etc/kolla/config/cinder/cinder-volume"
+  - "/etc/kolla/config/glance"
+  - "/etc/kolla/config/nova"
+
+ceph_keyring_files:
+  - "/etc/kolla/config/cinder/cinder-backup/ceph.client.cinder-backup.keyring"
+  - "/etc/kolla/config/cinder/cinder-backup/ceph.client.cinder.keyring"
+  - "/etc/kolla/config/cinder/cinder-volume/ceph.client.cinder.keyring"
+  - "/etc/kolla/config/glance/ceph.client.glance.keyring"
+  - "/etc/kolla/config/nova/ceph.client.nova.keyring"
+  - "/etc/kolla/config/nova/ceph.client.cinder.keyring"
+
+ceph_conf_files:
+  - "/etc/kolla/config/cinder/cinder-backup/ceph.conf"
+  - "/etc/kolla/config/cinder/cinder-volume/ceph.conf"
+  - "/etc/kolla/config/glance/ceph.conf"
+  - "/etc/kolla/config/nova/ceph.conf"
+
+ceph_keyrings_local_dir: "/var/tmp/ceph-keyrings"
+ceph_fsid_tmp_file: "/var/tmp/ceph_fsid"
+ceph_mon_dump_file: "/var/tmp/ceph_mon_dump.json"

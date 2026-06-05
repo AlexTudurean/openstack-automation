@@ -1,0 +1,48 @@
+---
+- name: Kolla ansible tasks
+  vars:
+    ansible_python_interpreter: "{{ venv_wrapper }}"
+  block:
+    - name: Install kolla-ansible
+      ansible.builtin.command: pip install {{ kolla_ansible_repo }}
+      args:
+        chdir: "{{ kolla_venv_path }}"
+      changed_when: false
+
+    - name: Create kolla-ansible configuration directory
+      ansible.builtin.file:
+        path: /etc/kolla
+        state: directory
+        mode: '0755'
+
+    - name: Copy kolla-ansible configuration files
+      ansible.builtin.copy:
+        src: "{{ kolla_venv_path }}/share/kolla-ansible/etc_examples/kolla/"
+        dest: /etc/kolla
+        remote_src: true
+        mode: preserve
+
+    - name: Copy kolla-ansible inventory file
+      ansible.builtin.copy:
+        src: multinode
+        dest: /etc/kolla/inventory
+        mode: '0644'
+
+    - name: Install Ansible Galaxy requirements
+      ansible.builtin.command: "{{ kolla_venv_path }}/bin/kolla-ansible install-deps"
+      changed_when: false
+
+- name: Create /etc/ansible directory
+  ansible.builtin.file:
+    path: /etc/ansible
+    state: directory
+    mode: '0755'
+
+- name: Write system-wide ansible.cfg for kolla-ansible
+  ansible.builtin.copy:
+    dest: /etc/ansible/ansible.cfg
+    mode: '0644'
+    content: |
+      [defaults]
+      host_key_checking = False
+      pipelining = True

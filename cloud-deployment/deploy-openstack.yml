@@ -1,20 +1,28 @@
-- name: Prepare all OpenStack nodes
+---
+- name: Prepare OpenStack nodes
   hosts: openstack_nodes
   gather_facts: true
   become: true
   roles:
-    - role: prep-openstack-nodes
+    - role: prep_openstack_nodes
 
-- name: Prepare storage node
+- name: Deploy Ceph
   hosts: storage_nodes
   gather_facts: true
   become: true
   roles:
-    - role: prep-storage-node
+    - role: deploy_ceph
 
-- name: Prepare management node
+- name: Install Kolla-Ansible
   hosts: management_nodes
   gather_facts: true
   become: true
   roles:
-    - role: prep-management-node
+    - role: install_kolla
+
+- name: Deploy OpenStack
+  hosts: management_nodes
+  gather_facts: true
+  become: true
+  roles:
+    - role: deploy_openstack

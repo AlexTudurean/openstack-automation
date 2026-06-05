@@ -1,17 +1,20 @@
-- name: Prepare storage
-  hosts: storage
+- name: Prepare all OpenStack nodes
+  hosts: openstack_nodes
   gather_facts: true
-  vars:
-    ansible_user: sysoperator
-    ansible_ssh_pass: sysoperator
-    ansible_become_pass: sysoperator
+  become: true
+  roles:
+    - role: prep-openstack-nodes
+
+- name: Prepare storage node
+  hosts: storage_nodes
+  gather_facts: true
+  become: true
   roles:
     - role: prep-storage-node
 
 - name: Prepare management node
-  hosts: localhost # management
+  hosts: management_nodes
   gather_facts: true
-  vars:
-    ansible_user: root
+  become: true
   roles:
     - role: prep-management-node

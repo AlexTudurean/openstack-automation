@@ -1,0 +1,8 @@
+---
+# Minimum docker Python SDK version required for kolla-ansible modules.
+# Ubuntu 24.04 ships 5.0.3 via apt (python3-docker) which is incompatible
+# with requests>=2.32 — the http+docker URL scheme was removed.
+docker_sdk_version: ">=7.0"
+
+openstack_node_packages:
+  - python3-pip

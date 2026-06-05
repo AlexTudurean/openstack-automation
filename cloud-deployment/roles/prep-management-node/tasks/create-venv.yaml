@@ -1,31 +1,27 @@
 ---
 - name: Install venv dependencies
-  apt:
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: present
-  with_items: "{{ venv_deps }}"
+  loop: "{{ venv_deps }}"
 
-# Creates a virtual environment for kolla-ansible and copies the venv wrapper to allow 
-# for easy activation of the virtual environment
-- name: Kolla venv creation
-  block:
-    - name: Create kolla virtual environment
-      command: python3 -m venv /opt/venv/kolla
+- name: Create kolla virtual environment
+  ansible.builtin.command: python3 -m venv {{ kolla_venv_path }}
+  args:
+    creates: "{{ kolla_venv_path }}/bin/activate"
 
-    - name: Copy venv wrapper script
-      copy:
-        src: "{{ playbook_dir }}/roles/prep-management-node/files/pyvenv"
-        dest: "{{ venv_wrapper }}"
-        mode: '0755'
-  tags: [create-venv]
+- name: Copy venv wrapper script
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/roles/prep-management-node/templates/pyvenv.j2"
+    dest: "{{ venv_wrapper }}"
+    mode: '0755'
 
-- name: Kolla venv tasks
+- name: Kolla venv pip tasks
   vars:
     ansible_python_interpreter: "{{ venv_wrapper }}"
   block:
     - name: Update pip
-      command: pip install --upgrade pip
+      ansible.builtin.command: pip install --upgrade pip
 
-    - name: Install kolla-ansible
-      command: pip install 'ansible-core>=2.15,<2.16.99'
-  tags: [create-venv]
+    - name: Install ansible-core
+      ansible.builtin.command: pip install 'ansible-core>=2.17'

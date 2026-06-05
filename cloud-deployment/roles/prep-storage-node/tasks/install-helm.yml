@@ -1,31 +1,41 @@
-- name: Install helm if not exists
-  vars: 
-    helm_download_url: https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
-  shell: |
-    curl -fsSL -o get_helm.sh {{ helm_download_url }}
-    chmod 700 get_helm.sh
-    ./get_helm.sh
+- name: Install system prerequisites
+  ansible.builtin.apt:
+    name:
+      - python3-pip
+      - curl
+    state: present
+    update_cache: true
+  become: true
+
+- name: Install Python kubernetes client
+  ansible.builtin.pip:
+    name: kubernetes
+    # --ignore-installed works around PyYAML version conflict with system packages.
+    # Known limitation: silent import failures possible if deps diverge. Consider a venv long-term.
+    extra_args: --break-system-packages --ignore-installed
+  become: true
+
+- name: Download Helm install script
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+    dest: /tmp/get_helm.sh
+    mode: '0700'
+  become: true
+
+- name: Install Helm
+  ansible.builtin.command: /tmp/get_helm.sh
   args:
-    chdir: /tmp
-  become: yes
-  become_user: root
-  register: helm_install_output
-- name: Print helm install output
-  debug:
-    var: helm_install_output
-- name: Add helm to PATH
-  command:
-    cmd: "ln -s /usr/local/bin/helm /usr/bin/helm"
-    creates: /usr/bin/helm
-  become: yes
-  become_user: root
-  when: helm_install_output.changed
-- name: Print helm version
-  command:
-    cmd: "helm version"
-  become: yes
-  become_user: root
+    creates: /usr/local/bin/helm
+  become: true
+
+- name: Print Helm version
+  ansible.builtin.command: helm version
+  become: true
   register: helm_version_output
-- name: Print helm version output
-  debug:
-    var: helm_version_output
+  changed_when: false
+  when: debug_mode | default(false)
+
+- name: Show Helm version
+  ansible.builtin.debug:
+    var: helm_version_output.stdout
+  when: debug_mode | default(false)

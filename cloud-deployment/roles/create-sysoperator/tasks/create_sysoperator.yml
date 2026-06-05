@@ -1,25 +1,22 @@
 ---
-# make sure we a wheel group
 - name: Make sure we have a 'wheel' group
-  group:
+  ansible.builtin.group:
     name: wheel
     state: present
 
-# allow wheel group to sudo without password
 - name: Allow wheel group to sudo without password
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/sudoers
     line: '%wheel ALL=(ALL) NOPASSWD: ALL'
     state: present
     validate: 'visudo -cf %s'
 
-# create sysoperator user
 - name: Create sysoperator user
-  user:
+  ansible.builtin.user:
     name: sysoperator
     group: wheel
     password: "{{ sysoperator_password | password_hash('sha512') }}"
     shell: /bin/bash
-    createhome: yes
+    create_home: true
     state: present
     update_password: on_create

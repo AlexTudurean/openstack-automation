@@ -1,17 +1,24 @@
-# create sysoperator ssh directory
 - name: Create sysoperator ssh directory
-  file:
+  ansible.builtin.file:
     path: "/home/sysoperator/.ssh"
     state: directory
     owner: sysoperator
     group: wheel
     mode: '0700'
 
-# copy ssh key to sysoperator
-- name: Copy ssh key to sysoperator
-  copy:
-    src: "{{ lookup('env', 'HOME') + '/.ssh/id_rsa.pub' }}"
+- name: Copy public key to sysoperator authorized_keys
+  ansible.builtin.copy:
+    src: "{{ lookup('env', 'HOME') + '/.ssh/openstack_key.pub' }}"
     dest: "/home/sysoperator/.ssh/authorized_keys"
     owner: sysoperator
     group: wheel
     mode: '0600'
+
+- name: Copy private key to controller for kolla-ansible
+  ansible.builtin.copy:
+    src: "{{ lookup('env', 'HOME') + '/.ssh/openstack_key' }}"
+    dest: "/home/sysoperator/.ssh/openstack_key"
+    owner: sysoperator
+    group: wheel
+    mode: '0600'
+  when: inventory_hostname in groups['controller_nodes']

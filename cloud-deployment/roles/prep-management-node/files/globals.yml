@@ -22,7 +22,7 @@
 #kolla_ansible_setup_gather_subset: "{{ omit }}"
 
 # Dummy variable to allow Ansible to accept this file.
-workaround_ansible_issue_8743: yes
+workaround_ansible_issue_8743: true
 
 # This variable is used as "any_errors_fatal" setting for the setup (gather
 # facts) plays.
@@ -134,7 +134,7 @@ kolla_internal_vip_address: "10.0.1.254"
 # Yet another way to workaround the naming problem is to create a bond for the
 # interface on all hosts and give the bond name here. Similar strategy can be
 # followed for other types of interfaces.
-network_interface: "enp5s0.4000"
+network_interface: "enp6s18.4000"
 
 # These can be adjusted for even more customization. The default is the same as
 # the 'network_interface'. These interfaces must contain an IP address.
@@ -163,7 +163,7 @@ network_interface: "enp5s0.4000"
 # though an IP address can exist on this interface, it will be unusable in most
 # configurations. It is recommended this interface not be configured with any IP
 # addresses for that reason.
-neutron_external_interface: "enp5s0.4001"
+neutron_external_interface: "enp6s18.4001"
 neutron_bridge_name: "br-ex"
 
 # Valid options are [ openvswitch, ovn, linuxbridge, vmware_nsxv, vmware_nsxv3, vmware_nsxp, vmware_dvs ]
@@ -325,7 +325,6 @@ neutron_bridge_name: "br-ex"
 #enable_rabbitmq: "{{ 'yes' if om_rpc_transport == 'rabbit' or om_notify_transport == 'rabbit' else 'no' }}"
 
 # OpenStack services can be enabled or disabled with these options
-enable_ceph: "no"
 #enable_aodh: "no"
 #enable_barbican: "no"
 #enable_blazar: "no"
@@ -421,7 +420,8 @@ enable_cinder_backup: "yes"
 #enable_placement: "{{ enable_nova | bool or enable_zun | bool }}"
 #enable_prometheus: "no"
 #enable_proxysql: "no"
-#enable_redis: "no"
+#enable_valkey: false
+enable_proxysql: false
 #enable_skyline: "no"
 #enable_swift: "no"
 #enable_swift_s3api: "no"
@@ -475,17 +475,13 @@ enable_cinder_backup: "yes"
 
 # Glance
 ceph_glance_user: "glance"
-ceph_glance_keyring: "client.{{ ceph_glance_user }}.keyring"
 ceph_glance_pool_name: "images"
 # Cinder
 ceph_cinder_user: "cinder"
-ceph_cinder_keyring: "client.{{ ceph_cinder_user }}.keyring"
 ceph_cinder_pool_name: "volumes"
 ceph_cinder_backup_user: "cinder-backup"
-ceph_cinder_backup_keyring: "client.{{ ceph_cinder_backup_user }}.keyring"
 ceph_cinder_backup_pool_name: "backups"
 # Nova
-ceph_nova_keyring: "{{ ceph_cinder_keyring }}"
 ceph_nova_user: "{{ ceph_cinder_user }}"
 ceph_nova_pool_name: "vms"
 # Gnocchi
@@ -637,6 +633,9 @@ nova_compute_virt_type: "kvm"
 
 # Enable DHCP agent(s) to use with OVN
 #neutron_ovn_dhcp_agent: "no"
+
+# OVN SB DB relay — new in 2026.1, disabled for single-region dev setup
+enable_ovn_sb_db_relay: "no"
 
 #############################
 # Horizon - Dashboard Options

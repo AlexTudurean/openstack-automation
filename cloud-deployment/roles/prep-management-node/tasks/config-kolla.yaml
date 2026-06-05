@@ -1,74 +1,56 @@
+# lookup() always reads from the Ansible control node (Mac), regardless of play target
+- name: Extract ceph cluster info
+  ansible.builtin.set_fact:
+    ceph_fsid: "{{ lookup('file', ceph_fsid_tmp_file) | regex_replace('\n', '') }}"
+    ceph_mon_dump: "{{ lookup('file', ceph_mon_dump_file) | from_json }}"
+
+- name: Derive ceph mon members and hosts from mon dump
+  ansible.builtin.set_fact:
+    mon_initial_members: "{{ ceph_mon_dump.mons | map(attribute='name') | list }}"
+    mon_hosts: "{{ ceph_mon_dump.mons | map(attribute='addr') | map('regex_replace', '/[0-9]+$', '') | list }}"
+
+# Render ceph.conf locally so the subsequent copy task can push it to the controller
+- name: Create ceph.conf on control node
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/roles/prep-management-node/templates/ceph.conf.j2"
+    dest: "{{ ceph_keyrings_local_dir }}/ceph.conf"
+    mode: '0644'
+  delegate_to: localhost
+  become: false
+
 - name: Config Kolla
   vars:
     ansible_python_interpreter: "{{ venv_wrapper }}"
   block:
-  - name: Generate Kolla passwords
-    command: kolla-genpwd
-    args:
-      chdir: /etc/kolla
-    tags: [config-globals]
+    - name: Generate Kolla passwords
+      ansible.builtin.command: "{{ kolla_venv_path }}/bin/kolla-genpwd"
+      environment:
+        PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      tags: [config-globals]
 
-  - name: Copy globals.yaml file to /etc/kolla
-    copy:
-      src: "{{ playbook_dir }}/roles/prep-management-node/files/globals.yml"
-      dest: /etc/kolla
-    tags: [config-globals]
+    - name: Copy globals.yml to /etc/kolla
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/roles/prep-management-node/files/globals.yml"
+        dest: /etc/kolla/globals.yml
+      tags: [config-globals]
 
-  # Create the /etc/kolla/config directory hierarchy
-  - name: Create /etc/kolla/config directory
-    file:
-      path: "{{ item }}"
-      state: directory
-    loop: "{{ config_dirs }}"
+    - name: Create /etc/kolla/config directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ config_dirs }}"
 
-  # Create the keyring files
-  - name: Create keyring temp files
-    vars:
-      client_name: "{{ item.split('/')[-1].split('.')[2] }}"
-      client_keyring_temp_file: "{{ item }}" 
-    include_tasks: "{{ playbook_dir }}/roles/prep-management-node/tasks/create-keyring-files.yaml"
-    loop: "{{ ceph_keyring_temp_files }}"
+    - name: Copy keyring files to /etc/kolla/config
+      ansible.builtin.copy:
+        src: "{{ ceph_keyrings_local_dir }}/ceph.client.{{ item.split('/')[-1].split('.')[2] }}.keyring"
+        dest: "{{ item }}"
+        mode: '0600'
+      loop: "{{ ceph_keyring_files }}"
 
-  - name: Copy keyring files to /etc/kolla/config
-    vars:
-      client_name: "{{ item.split('/')[-1].split('.')[2] }}"
-      client_keyring_temp_file: "/tmp/ceph-keyrings/ceph.client.{{ client_name }}.keyring"
-    copy: 
-      src: "{{ client_keyring_temp_file }}"
-      dest: "{{ item }}"
-    loop: "{{ ceph_keyring_files }}"
-
-  # Create the ceph.conf files
-  - name: Get ceph cluster fsid file
-    slurp:
-      src: "/tmp/ceph_fsid"
-    register: ceph_conf_file
-
-  - name: Extract ceph cluster fsid
-    set_fact:
-      ceph_fsid: "{{ ceph_conf_file['content'] | b64decode | regex_replace('\n', '') }}"
-    when: ceph_conf_file['content'] is defined
-    
-  - name: Create temp ceph.conf file
-    template:
-      src: "{{ playbook_dir }}/roles/prep-management-node/templates/ceph.conf.j2"
-      dest: "/tmp/ceph.conf"
-  
-  - name: Add newline at the end of the ceph.conf file
-    lineinfile:
-      dest: "/tmp/ceph.conf"
-      line: ""
-  
-  - name: Copy ceph.conf files to /etc/kolla/config
-    copy:
-      src: "/tmp/ceph.conf"
-      dest: "{{ item }}"
-    loop: "{{ ceph_conf_files }}"
-  
-
-  
-
-
-
-    
-  
+    - name: Copy ceph.conf to /etc/kolla/config
+      ansible.builtin.copy:
+        src: "{{ ceph_keyrings_local_dir }}/ceph.conf"
+        dest: "{{ item }}"
+        mode: '0644'
+      loop: "{{ ceph_conf_files }}"

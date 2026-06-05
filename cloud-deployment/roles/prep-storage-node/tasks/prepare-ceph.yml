@@ -1,116 +1,175 @@
-# Prepare ceph for use in the OpenStack cloud
-- name: Install python deps
-  pip:
-    name: kubernetes
-
 - name: Get the ceph-toolbox pod name
   kubernetes.core.k8s_info:
-    namespace: rook-ceph
+    namespace: "{{ rook_ceph_namespace }}"
     kind: pod
     label_selectors:
       - app=rook-ceph-tools
+    kubeconfig: "{{ k8s_kubeconfig }}"
   register: ceph_toolbox_pod
 
 - name: Create ceph pools
   kubernetes.core.k8s_exec:
-    namespace: rook-ceph
+    namespace: "{{ rook_ceph_namespace }}"
     pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
     command: ceph osd pool create {{ item }}
+    kubeconfig: "{{ k8s_kubeconfig }}"
   loop: "{{ ceph_pools }}"
+  register: pool_create_result
+  failed_when:
+    - pool_create_result.rc != 0
+    - "'already exists' not in (pool_create_result.stderr | default(''))"
+  changed_when: pool_create_result.rc == 0
 
-- name: Init ceph rbd
+- name: Init ceph rbd pools
   kubernetes.core.k8s_exec:
-    namespace: rook-ceph
+    namespace: "{{ rook_ceph_namespace }}"
     pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
     command: rbd pool init {{ item }}
+    kubeconfig: "{{ k8s_kubeconfig }}"
   loop: "{{ ceph_pools }}"
+  register: rbd_init_result
+  failed_when:
+    - rbd_init_result.rc != 0
+    - "'already initialized' not in (rbd_init_result.stderr | default(''))"
+  changed_when: false
 
-- name: Create cephx authentication
-  block:
-    - name: Glance cephx authentication
-      kubernetes.core.k8s_exec:
-        namespace: rook-ceph
-        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
-        command: ceph auth get-or-create client.glance mon 'profile rbd' osd 'profile rbd pool=images' mgr 'profile rbd pool=images'
+- name: Create glance cephx authentication
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: >
+      ceph auth get-or-create client.glance
+      mon 'profile rbd'
+      osd 'profile rbd pool=images'
+      mgr 'profile rbd pool=images'
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: glance_auth
+  changed_when: "'added key' in (glance_auth.stdout | default(''))"
 
-    - name: Cinder cephx authentication
-      kubernetes.core.k8s_exec:
-        namespace: rook-ceph
-        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
-        command: ceph auth get-or-create client.cinder mon 'profile rbd' osd 'profile rbd pool=volumes, profile rbd pool=vms, profile rbd-read-only pool=images' mgr 'profile rbd pool=volumes, profile rbd pool=vms' 
+- name: Create cinder cephx authentication
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: >
+      ceph auth get-or-create client.cinder
+      mon 'profile rbd'
+      osd 'profile rbd pool=volumes, profile rbd pool=vms, profile rbd-read-only pool=images'
+      mgr 'profile rbd pool=volumes, profile rbd pool=vms'
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: cinder_auth
+  changed_when: "'added key' in (cinder_auth.stdout | default(''))"
 
-    - name: Cinder-bakcup cephx authentication
-      kubernetes.core.k8s_exec:
-        namespace: rook-ceph
-        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
-        command: ceph auth get-or-create client.cinder-backup mon 'profile rbd' osd 'profile rbd pool=backups' mgr 'profile rbd pool=backups'
-    
-    - name: Nova cephx authentication
-      kubernetes.core.k8s_exec:
-        namespace: rook-ceph
-        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
-        command: ceph auth get-or-create client.nova
+- name: Create cinder-backup cephx authentication
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: >
+      ceph auth get-or-create client.cinder-backup
+      mon 'profile rbd'
+      osd 'profile rbd pool=backups'
+      mgr 'profile rbd pool=backups'
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: cinder_backup_auth
+  changed_when: "'added key' in (cinder_backup_auth.stdout | default(''))"
 
-# Create keyrings for each component and copy the results to files on the management node
-- name: Create keyrings
-  block:
-    - name: Glance keyring
-      kubernetes.core.k8s_exec:
-        namespace: rook-ceph
-        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
-        command: ceph auth get-key client.glance
-      register: glance_keyring
+- name: Create nova cephx authentication
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: ceph auth get-or-create client.nova
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: nova_auth
+  changed_when: "'added key' in (nova_auth.stdout | default(''))"
 
-    - name: Cinder keyring
-      kubernetes.core.k8s_exec:
-        namespace: rook-ceph
-        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
-        command: ceph auth get-key client.cinder
-      register: cinder_keyring
+- name: Get glance keyring key
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: ceph auth get-key client.glance
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: glance_keyring
+  changed_when: false
 
-    - name: Cinder-backup keyring
-      kubernetes.core.k8s_exec:
-        namespace: rook-ceph
-        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
-        command: ceph auth get-key client.cinder-backup
-      register: cinder_backup_keyring
-    
-    - name: Nova keyring
-      kubernetes.core.k8s_exec:
-        namespace: rook-ceph
-        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
-        command: ceph auth get-key client.nova
-      register: nova_keyring
+- name: Get cinder keyring key
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: ceph auth get-key client.cinder
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: cinder_keyring
+  changed_when: false
 
-    - name: Create local tmp keyrings directory
-      file:
-        path: /tmp/ceph-keyrings
-        state: directory
-      delegate_to: localhost
+- name: Get cinder-backup keyring key
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: ceph auth get-key client.cinder-backup
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: cinder_backup_keyring
+  changed_when: false
 
-    - name: Copy keyrings to management node
-      copy:
-        content: "{{ item.stdout }}"
-        dest: "/tmp/ceph-keyrings/{{ item.item }}"
-      with_items:
-        - { item: "ceph.client.glance.keyring", stdout: "{{ glance_keyring.stdout }}" }
-        - { item: "ceph.client.cinder.keyring", stdout: "{{ cinder_keyring.stdout }}" }
-        - { item: "ceph.client.cinder-backup.keyring", stdout: "{{ cinder_backup_keyring.stdout }}" }
-        - { item: "ceph.client.nova.keyring", stdout: "{{ nova_keyring.stdout }}" }
-      throttle: 1
-      delegate_to: localhost
+- name: Get nova keyring key
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: ceph auth get-key client.nova
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: nova_keyring
+  changed_when: false
 
 - name: Get ceph cluster fsid
-  block:
-    - name: Get ceph cluster fsid
-      kubernetes.core.k8s_exec:
-        namespace: rook-ceph
-        pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
-        command: ceph fsid
-      register: ceph_fsid
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: ceph fsid
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: ceph_fsid_result
+  changed_when: false
 
-    - name: Copy ceph fsid to management node
-      copy:
-        content: "{{ ceph_fsid.stdout }}"
-        dest: "/tmp/ceph_fsid"
-      delegate_to: localhost
+# Registered vars are on the Ansible control node already — write directly
+# there, no roundtrip through the storage node needed.
+- name: Create keyrings directory on control node
+  ansible.builtin.file:
+    path: "{{ ceph_keyrings_local_dir }}"
+    state: directory
+    mode: '0700'
+  delegate_to: localhost
+  become: false
+
+- name: Write keyring files to control node
+  ansible.builtin.copy:
+    content: "[client.{{ item.client }}]\nkey = {{ item.key }}\n"
+    dest: "{{ ceph_keyrings_local_dir }}/{{ item.name }}"
+    mode: '0600'
+  loop:
+    - { name: "ceph.client.glance.keyring",        client: "glance",        key: "{{ glance_keyring.stdout }}" }
+    - { name: "ceph.client.cinder.keyring",         client: "cinder",        key: "{{ cinder_keyring.stdout }}" }
+    - { name: "ceph.client.cinder-backup.keyring",  client: "cinder-backup", key: "{{ cinder_backup_keyring.stdout }}" }
+    - { name: "ceph.client.nova.keyring",           client: "nova",          key: "{{ nova_keyring.stdout }}" }
+  delegate_to: localhost
+  become: false
+
+- name: Write ceph fsid to control node
+  ansible.builtin.copy:
+    content: "{{ ceph_fsid_result.stdout }}"
+    dest: "{{ ceph_fsid_tmp_file }}"
+    mode: '0644'
+  delegate_to: localhost
+  become: false
+
+- name: Get ceph mon dump
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: ceph mon dump --format json
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: ceph_mon_dump
+  changed_when: false
+
+- name: Write ceph mon dump to control node
+  ansible.builtin.copy:
+    content: "{{ ceph_mon_dump.stdout }}"
+    dest: "{{ ceph_mon_dump_file }}"
+    mode: '0644'
+  delegate_to: localhost
+  become: false

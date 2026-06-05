@@ -1,3 +1,23 @@
 ---
-# defaults file for prep-storage-node
+# Ceph pool names used by OpenStack services
 ceph_pools: ["volumes", "images", "backups", "vms"]
+
+# Namespace for all Rook Ceph resources
+rook_ceph_namespace: rook-ceph
+
+# Helm chart versions — update here to upgrade everything at once
+rook_chart_version: "v1.20.0"
+ingress_nginx_chart_version: "4.15.1"
+
+# Rook Helm chart and repo names
+rook_repo: rook-release
+rook_operator_chart: rook-ceph
+rook_cluster_chart: rook-ceph-cluster
+
+# Kubeconfig path on the storage node (K3S server)
+k8s_kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+# Temporary file locations on the Ansible control node (Mac) — /var/tmp survives reboots
+ceph_keyrings_local_dir: "/var/tmp/ceph-keyrings"
+ceph_fsid_tmp_file: "/var/tmp/ceph_fsid"
+ceph_mon_dump_file: "/var/tmp/ceph_mon_dump.json"

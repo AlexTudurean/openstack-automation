@@ -1,0 +1,62 @@
+# Minimal overrides from chart defaults for a dev/dissertation single-replica Ceph cluster.
+# Run `helm show values rook-release/rook-ceph-cluster` to see all available defaults.
+
+# Single-replica pools — acceptable for dev, never for production
+configOverride: |
+  [global]
+  mon_allow_pool_delete = true
+  osd_pool_default_size = 1
+  osd_pool_default_min_size = 1
+
+toolbox:
+  enabled: true
+
+cephClusterSpec:
+  dashboard:
+    # Disable SSL so the service exposes http-dashboard (port 7000) which
+    # matches the Ingress resource that Rook creates automatically.
+    ssl: false
+
+  # Reduced CPU requests for dev/dissertation setup running on 4 vCPU VMs.
+  # Production defaults (mon: 1000m, osd: 1000m, mgr: 500m) saturate the nodes.
+  resources:
+    mgr:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+    mon:
+      requests:
+        cpu: "100m"
+        memory: "512Mi"
+    osd:
+      requests:
+        cpu: "250m"
+        memory: "1Gi"
+    prepareosd:
+      requests:
+        cpu: "100m"
+        memory: "50Mi"
+    mgr-sidecar:
+      requests:
+        cpu: "50m"
+        memory: "40Mi"
+    crashcollector:
+      requests:
+        cpu: "50m"
+        memory: "60Mi"
+    logcollector:
+      requests:
+        cpu: "50m"
+        memory: "100Mi"
+    cleanup:
+      requests:
+        cpu: "100m"
+        memory: "100Mi"
+    exporter:
+      requests:
+        cpu: "25m"
+        memory: "50Mi"
+    cmd-reporter:
+      requests:
+        cpu: "100m"
+        memory: "100Mi"

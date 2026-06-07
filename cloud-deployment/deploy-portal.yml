@@ -82,7 +82,7 @@
 
     - name: Copy portal source to VM
       ansible.posix.synchronize:
-        src: "{{ playbook_dir }}/../portal/"
+        src: "{{ playbook_dir }}/../../portal/"
         dest: "{{ portal_app_dir }}/"
         delete: true
         rsync_opts:

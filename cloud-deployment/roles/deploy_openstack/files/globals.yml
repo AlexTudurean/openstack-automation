@@ -47,6 +47,11 @@ workaround_ansible_issue_8743: true
 # Valid options are ['centos', 'debian', 'rocky', 'ubuntu']
 kolla_base_distro: "ubuntu"
 
+# quay.io/openstack.kolla images are the pre-built CI images — acknowledge their
+# "test" status so the precheck assertion is skipped (kolla-ansible 2026.1 removed
+# --use-test-images CLI flag but kept the registry_checks.yml guard variable).
+kolla_test_images: "yes"
+
 # Do not override this unless you know what you are doing.
 #openstack_release: "master"
 
@@ -134,7 +139,7 @@ kolla_internal_vip_address: "10.0.1.254"
 # Yet another way to workaround the naming problem is to create a bond for the
 # interface on all hosts and give the bond name here. Similar strategy can be
 # followed for other types of interfaces.
-network_interface: "enp6s18.4000"
+network_interface: "eth0.4000"
 
 # These can be adjusted for even more customization. The default is the same as
 # the 'network_interface'. These interfaces must contain an IP address.
@@ -163,7 +168,7 @@ network_interface: "enp6s18.4000"
 # though an IP address can exist on this interface, it will be unusable in most
 # configurations. It is recommended this interface not be configured with any IP
 # addresses for that reason.
-neutron_external_interface: "enp6s18.4001"
+neutron_external_interface: "enp6s19"
 neutron_bridge_name: "br-ex"
 
 # Valid options are [ openvswitch, ovn, linuxbridge, vmware_nsxv, vmware_nsxv3, vmware_nsxp, vmware_dvs ]
@@ -194,6 +199,15 @@ neutron_bridge_name: "br-ex"
 # This should be changed from the default in the event of a multi-region deployment
 # where the VIPs of different regions reside on a common subnet.
 #keepalived_virtual_router_id: "51"
+
+# Disable keepalived health-check track script.
+# kolla-ansible 2026.1 ships check_alive_proxysql.sh which uses socat to send
+# plain text to the ProxySQL admin socket, but that socket uses the MySQL wire
+# protocol — ProxySQL sends a binary handshake and resets the connection, so
+# socat exits 1 and keepalived drops MASTER state, removing the VIP.
+# For a single-controller setup there is no failover target anyway, so holding
+# the VIP unconditionally is correct.
+keepalived_track_script_enabled: "no"
 
 ###################
 # Dimension options
@@ -421,7 +435,7 @@ enable_cinder_backup: "yes"
 #enable_prometheus: "no"
 #enable_proxysql: "no"
 #enable_valkey: false
-enable_proxysql: false
+enable_proxysql: "yes"
 #enable_skyline: "no"
 #enable_swift: "no"
 #enable_swift_s3api: "no"

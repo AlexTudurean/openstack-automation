@@ -1,0 +1,142 @@
+---
+# Phase 7: Portal deployment — two plays in sequence.
+#
+# Play 1 runs on the controller to read the keystone_admin_password generated
+#         by kolla-genpwd. It is not stored in vault because kolla owns it.
+# Play 2 runs on the portal Proxmox VM (192.168.0.104): installs Docker,
+#         syncs portal source, renders .env, generates TLS cert, starts stack.
+#
+# Prerequisites:
+#   - portal VM bootstrapped (Phase 1)
+#   - OpenStack deployed (Phase 5)
+#   - init_resources run (Phase 6: --tags init_resources)
+#   - vault.yaml contains: portal_db_password, portal_jwt_secret
+
+- name: Read credentials needed for portal .env
+  hosts: controller_nodes
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Read keystone_admin_password from /etc/kolla/passwords.yml
+      ansible.builtin.shell: >
+        grep '^keystone_admin_password:' /etc/kolla/passwords.yml | awk '{print $2}'
+      register: keystone_password_raw
+      changed_when: false
+
+    - name: Set keystone_admin_password fact
+      ansible.builtin.set_fact:
+        keystone_admin_password: "{{ keystone_password_raw.stdout }}"
+
+    - name: Read vpn-gateway public key saved during Phase 6
+      ansible.builtin.slurp:
+        src: "~/.cloud-vpn-pubkey"
+      register: vpn_pubkey_file
+      delegate_to: localhost
+      become: false
+
+    - name: Set vpn_gateway_public_key fact
+      ansible.builtin.set_fact:
+        vpn_gateway_public_key: "{{ vpn_pubkey_file.content | b64decode | trim }}"
+
+    - name: Read SSH private key that was injected into vpn-gateway
+      ansible.builtin.slurp:
+        src: /root/.ssh/id_ecdsa
+      register: vpn_gateway_ssh_key_file
+      no_log: true
+
+    - name: Set vpn_gateway_ssh_private_key fact
+      ansible.builtin.set_fact:
+        vpn_gateway_ssh_private_key: "{{ vpn_gateway_ssh_key_file.content | b64decode }}"
+      no_log: true
+
+- name: Deploy portal application
+  hosts: portal_nodes
+  gather_facts: false
+  vars:
+    keystone_admin_password: "{{ hostvars[groups['controller_nodes'][0]]['keystone_admin_password'] }}"
+    vpn_gateway_public_key: "{{ hostvars[groups['controller_nodes'][0]]['vpn_gateway_public_key'] }}"
+    vpn_gateway_ssh_private_key: "{{ hostvars[groups['controller_nodes'][0]]['vpn_gateway_ssh_private_key'] }}"
+    vpn_gateway_endpoint: "{{ vpn_gateway_endpoint_override | default('192.168.0.100:51821') }}"
+
+  tasks:
+    - name: Wait for SSH to become available
+      ansible.builtin.wait_for_connection:
+        timeout: 120
+
+    - name: Install Docker CE
+      ansible.builtin.shell: |
+        curl -fsSL https://get.docker.com | sh
+        usermod -aG docker sysoperator
+      args:
+        creates: /usr/bin/docker
+      become: true
+
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ portal_app_dir }}"
+        state: directory
+        owner: sysoperator
+        group: wheel
+        mode: '0755'
+      become: true
+
+    - name: Copy portal source to VM
+      ansible.posix.synchronize:
+        src: "{{ playbook_dir }}/../portal/"
+        dest: "{{ portal_app_dir }}/"
+        delete: true
+        rsync_opts:
+          - "--exclude=node_modules"
+          - "--exclude=__pycache__"
+          - "--exclude=.env"
+          - "--exclude=certs/"
+          - "--exclude=keys/"
+
+    - name: Create keys directory
+      ansible.builtin.file:
+        path: "{{ portal_app_dir }}/keys"
+        state: directory
+        owner: sysoperator
+        group: wheel
+        mode: '0700'
+      become: true
+
+    - name: Copy vpn-gateway SSH key to portal VM
+      ansible.builtin.copy:
+        content: "{{ vpn_gateway_ssh_private_key }}"
+        dest: "{{ portal_app_dir }}/keys/vpn_gateway.key"
+        mode: '0600'
+      no_log: true
+
+    - name: Render .env file from vault secrets
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/templates/portal_env.j2"
+        dest: "{{ portal_app_dir }}/.env"
+        mode: '0600'
+
+    - name: Generate self-signed TLS certificate
+      ansible.builtin.shell: |
+        mkdir -p {{ portal_app_dir }}/certs
+        openssl req -x509 -nodes -newkey rsa:2048 \
+          -keyout {{ portal_app_dir }}/certs/key.pem \
+          -out {{ portal_app_dir }}/certs/cert.pem \
+          -days 3650 \
+          -subj "/CN=cloud.tudu.io"
+      args:
+        creates: "{{ portal_app_dir }}/certs/cert.pem"
+
+    - name: Build and start Docker Compose stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ portal_app_dir }}"
+        build: always
+        state: present
+        pull: missing
+
+    - name: Print portal post-deploy info
+      ansible.builtin.debug:
+        msg:
+          - "Portal is live at https://192.168.0.104"
+          - "Add to Mac /etc/hosts: 192.168.0.104 cloud.tudu.io"
+          - "Bootstrap first admin (one-time):"
+          - "  ssh sysoperator@192.168.0.104"
+          - "  docker exec -it portal-backend-1 python -m app.scripts.create_admin"

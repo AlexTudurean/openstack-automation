@@ -6,5 +6,7 @@ node_hosts:
     hostname: compute
   - ip: 10.0.1.4
     hostname: storage
+  - ip: 192.168.0.104
+    hostname: portal
 
 sysoperator_password: sysoperator

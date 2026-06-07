@@ -11,10 +11,17 @@ configOverride: |
 toolbox:
   enabled: true
 
+ingress:
+  dashboard:
+    ingressClassName: nginx
+    host:
+      name: ceph.tudu.io
+      path: /
+
 cephClusterSpec:
   dashboard:
-    # Disable SSL so the service exposes http-dashboard (port 7000) which
-    # matches the Ingress resource that Rook creates automatically.
+    # ssl: false exposes http-dashboard (port 7000) — required to match the
+    # Ingress backend port name that Rook generates for the dashboard service.
     ssl: false
 
   # Reduced CPU requests for dev/dissertation setup running on 4 vCPU VMs.

@@ -4,3 +4,7 @@
   ansible.builtin.command:
     cmd: netplan apply
   changed_when: true
+  # async + poll: Ansible polls every 5s via SSH, auto-retrying if the connection
+  # briefly drops while netplan restarts the management interface
+  async: 60
+  poll: 5

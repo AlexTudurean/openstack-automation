@@ -1,6 +1,6 @@
 ---
 - name: Bootstrap nodes
-  hosts: all
+  hosts: openstack_nodes,portal_nodes
   gather_facts: true
   become: true
   roles:

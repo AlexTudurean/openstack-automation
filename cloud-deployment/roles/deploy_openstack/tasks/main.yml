@@ -6,3 +6,11 @@
 - name: Deploy OpenStack
   ansible.builtin.import_tasks: deploy_kolla.yml
   tags: [deploy_kolla]
+
+- name: Init VPN gateway
+  ansible.builtin.import_tasks: init_vpn_gateway.yml
+  tags: [init_vpn_gateway, never]
+
+- name: Init shared resources (mgmt-net, pool-sg)
+  ansible.builtin.import_tasks: init_resources.yml
+  tags: [init_resources, never]

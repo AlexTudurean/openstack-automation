@@ -57,3 +57,9 @@
         dest: "{{ item }}"
         mode: '0644'
       loop: "{{ ceph_conf_files }}"
+
+    - name: Copy nova-compute config override
+      ansible.builtin.copy:
+        src: nova-compute.conf
+        dest: /etc/kolla/config/nova/nova-compute.conf
+        mode: '0644'

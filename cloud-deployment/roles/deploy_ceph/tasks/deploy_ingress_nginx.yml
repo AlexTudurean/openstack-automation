@@ -17,3 +17,28 @@
     wait_timeout: "300s"
     update_repo_cache: true
     kubeconfig: "{{ k8s_kubeconfig }}"
+
+- name: Install iptables-persistent
+  ansible.builtin.apt:
+    name: [iptables-persistent, netfilter-persistent]
+    state: present
+
+# Block HTTP/HTTPS on the Proxmox LAN interface (eth0) so the ingress is only
+# reachable via the management VLAN (eth0.4000 / 10.0.1.x), which requires the
+# admin VPN. Must use the raw table PREROUTING chain — K3S Klipper LB applies
+# DNAT in nat PREROUTING (port 80 → NodePort), so INPUT rules never fire.
+# raw PREROUTING runs before nat, so the DROP lands before DNAT.
+- name: Block HTTP/HTTPS on Proxmox LAN interface (raw PREROUTING)
+  ansible.builtin.iptables:
+    table: raw
+    chain: PREROUTING
+    in_interface: eth0
+    protocol: tcp
+    destination_port: "{{ item }}"
+    jump: DROP
+    state: present
+  loop: ["80", "443"]
+
+- name: Persist iptables rules
+  ansible.builtin.command: netfilter-persistent save
+  changed_when: true

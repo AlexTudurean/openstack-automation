@@ -5,6 +5,7 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
+  tags: [prep_openstack_nodes]
 
 # Ubuntu 24.04 ships python3-docker 5.0.3 via apt. That version uses the
 # http+docker URL scheme which requests>=2.32 dropped, causing kolla-ansible
@@ -14,3 +15,4 @@
     name: "docker{{ docker_sdk_version }}"
     extra_args: --break-system-packages
     executable: pip3
+  tags: [prep_openstack_nodes]

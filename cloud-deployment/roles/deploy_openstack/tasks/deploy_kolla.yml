@@ -1,38 +1,54 @@
 ---
 - name: Bootstrap servers
+  become: true
   vars:
     ansible_python_interpreter: "{{ venv_wrapper }}"
   ansible.builtin.command: >
     {{ kolla_venv_path }}/bin/kolla-ansible bootstrap-servers
-    -i /etc/kolla/inventory --use-test-images
+    -i /etc/kolla/inventory
   environment:
     PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   changed_when: true
   tags: [kolla_bootstrap]
 
 - name: Run prechecks
+  become: true
   vars:
     ansible_python_interpreter: "{{ venv_wrapper }}"
   ansible.builtin.command: >
     {{ kolla_venv_path }}/bin/kolla-ansible prechecks
-    -i /etc/kolla/inventory --use-test-images
+    -i /etc/kolla/inventory
   environment:
     PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   changed_when: false
   tags: [kolla_prechecks]
 
 - name: Deploy OpenStack containers
+  become: true
   vars:
     ansible_python_interpreter: "{{ venv_wrapper }}"
   ansible.builtin.command: >
     {{ kolla_venv_path }}/bin/kolla-ansible deploy
-    -i /etc/kolla/inventory --use-test-images
+    -i /etc/kolla/inventory
   environment:
     PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   changed_when: true
   tags: [kolla_deploy]
 
+- name: Reconfigure OpenStack services
+  become: true
+  vars:
+    ansible_python_interpreter: "{{ venv_wrapper }}"
+  ansible.builtin.command: >
+    {{ kolla_venv_path }}/bin/kolla-ansible reconfigure
+    -i /etc/kolla/inventory
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  changed_when: true
+  tags: [kolla_reconfigure, never]
+
 - name: Install OpenStack CLI client
+  become: true
   vars:
     ansible_python_interpreter: "{{ venv_wrapper }}"
   ansible.builtin.command: >
@@ -42,19 +58,21 @@
   tags: [kolla_post]
 
 - name: Run post-deploy
+  become: true
   vars:
     ansible_python_interpreter: "{{ venv_wrapper }}"
-  ansible.builtin.command: "{{ kolla_venv_path }}/bin/kolla-ansible post-deploy"
+  ansible.builtin.command: "{{ kolla_venv_path }}/bin/kolla-ansible post-deploy -i /etc/kolla/inventory"
   environment:
     PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   changed_when: true
   tags: [kolla_post]
 
 - name: Run init-runonce
+  become: true
   vars:
     ansible_python_interpreter: "{{ venv_wrapper }}"
   ansible.builtin.command: "{{ kolla_venv_path }}/share/kolla-ansible/init-runonce"
   environment:
     PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   changed_when: true
-  tags: [kolla_init]
+  tags: [kolla_init, never]

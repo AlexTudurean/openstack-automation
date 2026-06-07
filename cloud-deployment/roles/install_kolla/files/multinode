@@ -5,8 +5,13 @@ ansible_ssh_private_key_file=/home/sysoperator/.ssh/openstack_key
 
 # These initial groups are the only groups required to be modified. The
 # additional groups are for more control of the environment.
+#
+# IMPORTANT: Do NOT use hostnames that match group names (e.g. a host named
+# "compute" inside the [compute] group). Ansible's host pattern resolver picks
+# the HOST over the GROUP when names collide, which silently excludes all other
+# group members from plays that use `hosts: compute`. Use ansible_host to map
+# the alias to the actual VLAN IP instead.
 [control]
-# These hostname must be resolvable from your deployment host
 controller
 
 # The network nodes are where your l3-agent and loadbalancers will run
@@ -15,7 +20,9 @@ controller
 controller
 
 [compute]
-compute
+cmp01 ansible_host=10.0.1.3
+controller
+stor01 ansible_host=10.0.1.4
 
 [monitoring]
 controller
@@ -23,10 +30,10 @@ controller
 # When compute nodes and control nodes use different interfaces,
 # you need to comment out "api_interface" and other interfaces from the globals.yml
 # and specify like below:
-#compute neutron_external_interface=eth0 api_interface=em1 tunnel_interface=em1
+#cmp01 neutron_external_interface=eth0 api_interface=em1 tunnel_interface=em1
 
 [storage]
-storage
+stor01 ansible_host=10.0.1.4
 
 [deployment]
 localhost       ansible_connection=local
@@ -74,6 +81,9 @@ compute
 network
 
 [mariadb:children]
+control
+
+[proxysql:children]
 control
 
 [rabbitmq:children]

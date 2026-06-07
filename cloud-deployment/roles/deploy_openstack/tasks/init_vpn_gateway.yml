@@ -1,0 +1,217 @@
+---
+- name: Install wireguard-tools for key generation
+  ansible.builtin.package:
+    name: wireguard-tools
+    state: present
+  become: true
+
+- name: Generate WireGuard server private key
+  ansible.builtin.command: wg genkey
+  register: wg_private_key_raw
+  changed_when: true
+
+- name: Derive WireGuard server public key
+  ansible.builtin.shell: "echo {{ wg_private_key_raw.stdout | quote }} | wg pubkey"
+  args:
+    executable: /bin/bash
+  register: wg_public_key_raw
+  changed_when: false
+
+- name: Set WireGuard key facts
+  ansible.builtin.set_fact:
+    wg_server_private_key: "{{ wg_private_key_raw.stdout }}"
+    wg_server_public_key: "{{ wg_public_key_raw.stdout }}"
+
+- name: Save WireGuard server public key to Mac
+  ansible.builtin.copy:
+    content: "{{ wg_server_public_key }}\n"
+    dest: "~/.cloud-vpn-pubkey"
+    mode: '0644'
+  delegate_to: localhost
+  become: false
+
+- name: Check if ubuntu-24.04 image exists in Glance
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack image show ubuntu-24.04 -f value -c id
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  register: ubuntu_image_check
+  failed_when: false
+  changed_when: false
+
+- name: Download ubuntu-24.04 cloud image
+  ansible.builtin.get_url:
+    url: "{{ ubuntu_cloud_image_url }}"
+    dest: "/tmp/ubuntu-24.04-server-cloudimg-amd64.img"
+    mode: '0644'
+  when: ubuntu_image_check.rc != 0
+
+- name: Upload ubuntu-24.04 image to Glance
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack image create ubuntu-24.04
+    --disk-format qcow2
+    --container-format bare
+    --file /tmp/ubuntu-24.04-server-cloudimg-amd64.img
+    --public
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  when: ubuntu_image_check.rc != 0
+  changed_when: true
+
+- name: Check if vpn-gateway-sg security group exists
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack security group show vpn-gateway-sg -f value -c id
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  register: sg_check
+  failed_when: false
+  changed_when: false
+
+- name: Create vpn-gateway-sg security group
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack security group create vpn-gateway-sg
+    --description "VPN gateway: WireGuard user VPN + restricted SSH"
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  when: sg_check.rc != 0
+  changed_when: true
+
+- name: Add rules to vpn-gateway-sg
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack security group rule create {{ item }} vpn-gateway-sg
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  loop:
+    - "--protocol udp --dst-port {{ vpn_gateway_wg_port }} --remote-ip 0.0.0.0/0"
+    - "--protocol tcp --dst-port 22 --remote-ip 10.0.1.0/24"
+    - "--protocol tcp --dst-port 22 --remote-ip 10.99.0.0/24"
+  when: sg_check.rc != 0
+  changed_when: true
+  failed_when: false
+
+- name: Render vpn-gateway cloud-init user_data
+  ansible.builtin.template:
+    src: vpn_gateway_userdata.j2
+    dest: /tmp/vpn-gw-userdata.yaml
+    mode: '0600'
+
+- name: Check if vpn-gateway VM exists
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack server show vpn-gateway -f value -c id
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  register: vm_check
+  failed_when: false
+  changed_when: false
+
+- name: Create vpn-gateway VM
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack server create
+    --image {{ vpn_gateway_image }}
+    --flavor {{ vpn_gateway_flavor }}
+    --key-name mykey
+    --network demo-net
+    --security-group {{ vpn_gateway_sg }}
+    --user-data /tmp/vpn-gw-userdata.yaml
+    vpn-gateway
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  when: vm_check.rc != 0
+  changed_when: true
+
+- name: Wait for vpn-gateway VM to reach ACTIVE status
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack server show vpn-gateway -f value -c status
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  register: vm_status
+  until: vm_status.stdout == "ACTIVE"
+  retries: 30
+  delay: 10
+  changed_when: false
+  when: vm_check.rc != 0
+
+- name: Get vpn-gateway demo-net port ID
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack port list
+    --server vpn-gateway
+    --fixed-ip ip-address={{ vpn_gateway_demo_ip }}
+    -f value -c ID
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  register: vpn_gateway_port
+  changed_when: false
+
+- name: Allow vpn-gateway to route user VPN source addresses
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack port set
+    --allowed-address ip-address={{ vpn_gateway_tunnel_subnet }}
+    {{ vpn_gateway_port.stdout }}
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  when: vpn_gateway_port.stdout | length > 0
+  changed_when: true
+  failed_when: false
+
+- name: Allocate floating IP for vpn-gateway
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack floating ip create public1
+    --floating-ip-address {{ vpn_gateway_floating_ip }}
+    -f value -c floating_ip_address
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  register: vpn_floating_ip
+  when: vm_check.rc != 0
+  changed_when: true
+
+- name: Associate floating IP with vpn-gateway
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack server add floating ip vpn-gateway {{ vpn_floating_ip.stdout }}
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  when: vm_check.rc != 0
+  changed_when: true
+
+- name: Print vpn-gateway post-deploy info
+  ansible.builtin.debug:
+    msg:
+      - "vpn-gateway floating IP : {{ vpn_gateway_floating_ip }}"
+      - "WireGuard server pubkey : {{ wg_server_public_key }}"
+      - "Public key saved locally: ~/.cloud-vpn-pubkey"
+      - "Next step on Proxmox   : iptables -t nat -A PREROUTING -p udp --dport {{ vpn_gateway_wg_port }} -j DNAT --to-destination {{ vpn_gateway_floating_ip }}:{{ vpn_gateway_wg_port }}"

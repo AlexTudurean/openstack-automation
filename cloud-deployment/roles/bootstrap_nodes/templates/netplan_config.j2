@@ -4,12 +4,17 @@ network:
   ethernets:
 {% for interface in ethernets %}
     {{ interface.link }}:
+      dhcp4: false
+{% if interface.addresses is defined %}
       addresses: {{ interface.addresses }}
+{% endif %}
+{% if interface.routes is defined %}
       routes:
 {% for route in interface.routes %}
         - to: {{ route.to }}
           via: {{ route.via }}
 {% endfor %}
+{% endif %}
 {% if interface.nameservers is defined %}
       nameservers:
         addresses: {{ interface.nameservers.addresses }}

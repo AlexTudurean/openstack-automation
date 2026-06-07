@@ -28,3 +28,20 @@ ceph_conf_files:
 ceph_keyrings_local_dir: "/var/tmp/ceph-keyrings"
 ceph_fsid_tmp_file: "/var/tmp/ceph_fsid"
 ceph_mon_dump_file: "/var/tmp/ceph_mon_dump.json"
+
+vpn_gateway_image: "ubuntu-24.04"
+vpn_gateway_flavor: "m1.small"
+vpn_gateway_sg: "vpn-gateway-sg"
+vpn_gateway_floating_ip: "10.0.2.150"
+vpn_gateway_demo_ip: "10.0.0.41"
+vpn_gateway_wg_port: 51821
+vpn_gateway_tunnel_subnet: "10.99.1.0/24"
+vpn_gateway_routed_subnet: "10.0.0.0/24"
+
+mgmt_net_cidr: "10.0.4.0/24"
+mgmt_net_gateway: "10.0.4.1"
+mgmt_router_external_ip: "10.0.2.200"
+
+portal_ip: "192.168.0.104"
+vpn_gateway_tunnel_server_ip: "10.99.1.1/24"
+ubuntu_cloud_image_url: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"

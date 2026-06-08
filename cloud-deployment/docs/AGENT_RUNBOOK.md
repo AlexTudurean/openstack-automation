@@ -105,6 +105,47 @@ qm list
 `proxmox-setup.sh` skips VMs that already exist, so re-running it will **not**
 retrofit `onboot` onto existing VMs — use the loop above for that.
 
+### Full-stack cold-boot behaviour
+
+The first full power-cycle (2026-06-08) exposed several "configured at deploy
+time but not persisted" gaps (DEVLOG Challenges 29–33). **All are now in the
+automation**, so a clean cold boot should recover unattended:
+
+| Layer | Survives reboot via | If it didn't |
+|---|---|---|
+| Proxmox VMs autostart | `qm --onboot 1` (`proxmox-setup.sh`) | loop above |
+| Proxmox IP forwarding | `/etc/sysctl.d/99-openstack-forward.conf` | `sysctl -w net.ipv4.ip_forward=1` on host |
+| Node `/etc/hosts` (RabbitMQ) | cloud-init `manage_etc_hosts: false` + mgmt-IP entries (`bootstrap_nodes`) | see Challenge 30 |
+| OpenStack guests resume | `resume_guests_state_on_host_boot` (`nova-compute.conf`) | `openstack server start <vm>` |
+| vpn-gateway dnsmasq | `bind-dynamic` + `After=wg-quick@wg0` (`vpn_gateway_userdata.j2`) | `systemctl restart dnsmasq` on gateway |
+
+Post-reboot health sweep (run from the Mac; OpenStack checks need the admin VPN):
+
+```bash
+# 1. Nodes reachable (LAN works even without VPN)
+for ip in 101 102 103 104; do ssh -i ~/.ssh/openstack_key sysoperator@192.168.0.$ip 'echo ok'; done
+
+# 2. Control plane healthy (no unhealthy containers, rabbitmq up)
+ssh -i ~/.ssh/openstack_key sysoperator@192.168.0.101 \
+  "sudo docker ps -a --format '{{.Names}} {{.Status}}' | grep -iE 'unhealthy|Exited|Restarting'"
+
+# 3. OpenStack services + guests (openstack client lives at /opt/venv/kolla/bin)
+ssh -i ~/.ssh/openstack_key sysoperator@192.168.0.101 'sudo bash -c "
+  source /etc/kolla/admin-openrc.sh; OS=/opt/venv/kolla/bin/openstack
+  \$OS compute service list; \$OS network agent list; \$OS server list --all-projects"'
+
+# 4. Ceph (Rook in K3S on storage)
+ssh -i ~/.ssh/openstack_key sysoperator@192.168.0.103 \
+  'sudo kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph -s'
+
+# 5. Admin VPN reaches the management VLAN (Horizon / Ceph dashboard)
+nc -z -G3 10.0.1.254 8080 && echo horizon-ok
+nc -z -G3 10.0.1.4 32680 && echo ceph-dash-ok
+```
+
+If step 5 fails but the tunnel is up (`ping 10.99.0.1` works), check
+`ip_forward` on the Proxmox host first — see Challenge 32.
+
 ---
 
 ## 4. WireGuard VPN

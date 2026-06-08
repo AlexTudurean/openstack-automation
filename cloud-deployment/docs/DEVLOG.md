@@ -490,6 +490,51 @@ done
 
 **Lesson**: `qm create` does not enable autostart by default — VMs meant to survive a host reboot need an explicit `--onboot 1`. Provisioning scripts should set it at create time, and the reboot-recovery loop is documented in `AGENT_RUNBOOK.md` §3.1.
 
+> **The first full power-cycle of the lab (2026-06-08) exposed four separate
+> "configured at deploy time but never made to survive a reboot" bugs
+> (Challenges 29–33). Each is now baked into the automation so a cold boot of
+> the whole stack recovers unattended.**
+
+### Challenge 30: RabbitMQ Crash-Loops After Reboot — cloud-init Wipes `/etc/hosts`
+
+**Problem**: After the host reboot, `rabbitmq` on the controller exited (1) in a loop, and every AMQP-dependent service (nova-conductor/scheduler, all neutron agents, cinder, heat-engine) reported `unhealthy`. The whole control plane was effectively down.
+
+**Root cause**: RabbitMQ log showed `epmd error for host controller: address (cannot connect to host/port)`. Kolla runs the broker as `rabbit@controller` with `ERL_EPMD_ADDRESS=10.0.1.2` (the management IP), so the hostname `controller` must resolve to `10.0.1.2`. But the Ubuntu cloud image ships `manage_etc_hosts: true`, so cloud-init **regenerates `/etc/hosts` on every boot** from its template — wiping the Kolla-added `10.0.1.2 controller` mapping and leaving only `127.0.1.1 controller`. epmd bound to `10.0.1.2` while the node name resolved to loopback → mismatch → crash. (Containers run host-network and seed their hosts file from the host's, so the breakage propagates.)
+
+**Fix**: `bootstrap_nodes/update_hosts.yml` now drops `/etc/cloud/cloud.cfg.d/99-disable-manage-etc-hosts.cfg` (`manage_etc_hosts: false`) and removes the `127.0.1.1 <hostname>` line, in addition to writing the management-IP mappings. Applied live on all three nodes, then `docker restart rabbitmq` → healthy, dependents recovered on their own.
+
+**Lesson**: Kolla requires each node's hostname to resolve to its `api_interface` IP. cloud-init's `manage_etc_hosts` silently fights that on every boot — disable it on any Kolla node.
+
+### Challenge 31: Tenant VMs Stay SHUTOFF After Compute Reboot
+
+**Problem**: After the compute nodes came back, all OpenStack instances — including the `vpn-gateway` the portal depends on — were `SHUTOFF`. The portal could not serve user VPN/DNS until they were started by hand.
+
+**Root cause**: Nova does not resume guests after a compute-node reboot unless `resume_guests_state_on_host_boot` is enabled; it defaults to off, leaving instances in their last libvirt state (stopped).
+
+**Fix**: Added `resume_guests_state_on_host_boot = True` to `/etc/kolla/config/nova/nova-compute.conf` (pushed by `configure_kolla`). Applied live to `/etc/kolla/nova-compute/nova.conf` on all three nodes + `docker restart nova_compute`. Started the already-down VMs once with `openstack server start`.
+
+**Lesson**: This is the OpenStack-layer equivalent of Proxmox `onboot` — without it, every guest needs a manual start after a host power-cycle.
+
+### Challenge 32: Admin VPN Can't Reach Management VLAN After Reboot — `ip_forward=0` on Proxmox
+
+**Problem**: With the admin WireGuard VPN connected, Horizon (`10.0.1.254:8080`) and the Ceph dashboard (`10.0.1.4:32680`) were unreachable. The tunnel itself was fine (`10.99.0.1` pinged), but nothing on `10.0.1.0/24` responded — including `10.0.1.1`.
+
+**Root cause**: `cat /proc/sys/net/ipv4/ip_forward` on Proxmox returned `0`. The VPN terminates on Proxmox and routes the management VLAN via the controller (`10.0.1.0/24 via 192.168.0.101`); with forwarding disabled the kernel dropped every forwarded packet. `proxmox-setup.sh` had enabled it by appending to `/etc/sysctl.conf`, which did not survive the reboot.
+
+**Fix**: `proxmox-setup.sh` now writes `/etc/sysctl.d/99-openstack-forward.conf` (idempotent, reliably re-applied at boot) instead of appending to `sysctl.conf`. Same drop-in applied live on the host.
+
+**Lesson**: For settings that must persist, use a dedicated `/etc/sysctl.d/*.conf` drop-in — appending to `/etc/sysctl.conf` is non-idempotent and proved unreliable across reboots here.
+
+### Challenge 33: dnsmasq Fails on vpn-gateway Boot — Races WireGuard Interface
+
+**Problem**: After the `vpn-gateway` VM booted, `dnsmasq` was `failed` (`unknown interface wg0`), so VPN users would have no name resolution for dev servers.
+
+**Root cause**: The dnsmasq config used `interface=wg0` + `bind-interfaces`, which requires `wg0` to already exist at start. On boot, dnsmasq sometimes wins the race against `wg-quick@wg0` and aborts because the interface isn't up yet.
+
+**Fix**: Changed `bind-interfaces` → `bind-dynamic` in `vpn_gateway_userdata.j2` (dnsmasq tolerates the interface appearing later and binds when it does), plus a `dnsmasq.service` drop-in ordering it `After=wg-quick@wg0.service`. Applied live on the gateway.
+
+**Lesson**: `bind-dynamic` is the correct dnsmasq option whenever it serves an interface that is created after boot (WireGuard, bridges, VPNs).
+
 ---
 
 ## Decisions Log

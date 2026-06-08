@@ -19,15 +19,28 @@ write_files:
   - path: /etc/dnsmasq.d/vpn-gateway.conf
     content: |
       interface=wg0
-      bind-interfaces
+      # bind-dynamic (not bind-interfaces) so dnsmasq starts even if wg0 does
+      # not exist yet and binds to it when it appears. With bind-interfaces,
+      # dnsmasq aborts at boot with "unknown interface wg0" whenever it wins the
+      # startup race against wg-quick@wg0, leaving VPN users with no DNS.
+      bind-dynamic
       server=8.8.8.8
       server=8.8.4.4
       expand-hosts
       domain=cloud.internal
       no-dhcp-interface=wg0
 
+  # Belt-and-suspenders ordering: start dnsmasq after the WireGuard interface.
+  - path: /etc/systemd/system/dnsmasq.service.d/10-after-wireguard.conf
+    content: |
+      [Unit]
+      After=wg-quick@wg0.service
+      Wants=wg-quick@wg0.service
+
 runcmd:
   - echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
   - sysctl -p
   - systemctl enable --now wg-quick@wg0
+  - systemctl daemon-reload
+  - systemctl enable dnsmasq
   - systemctl restart dnsmasq

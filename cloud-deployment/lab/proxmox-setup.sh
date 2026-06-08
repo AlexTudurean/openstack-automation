@@ -189,9 +189,12 @@ log "Configuring iptables rules..."
 # Ensure netfilter-persistent is available for rule persistence
 apt-get install -y -q netfilter-persistent iptables-persistent
 
-# Enable IP forwarding
-echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
-sysctl -p -q
+# Enable IP forwarding — required so the admin VPN (terminating on this host)
+# can route into the OpenStack management VLAN (10.0.1.0/24 via the controller).
+# Use a dedicated /etc/sysctl.d drop-in (idempotent, reliably re-applied on boot)
+# instead of appending to /etc/sysctl.conf, which proved not to survive a reboot.
+echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-openstack-forward.conf
+sysctl --system -q
 
 # VM internet access: MASQUERADE floating IP traffic out through vmbr0
 iptables -C FORWARD -i vmbr1 -o vmbr0 -j ACCEPT 2>/dev/null || \

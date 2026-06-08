@@ -1,4 +1,17 @@
 ---
+# cloud-init ships images with `manage_etc_hosts: true`, which regenerates
+# /etc/hosts from a template on EVERY boot — wiping the management-IP mappings
+# below and restoring `127.0.1.1 <hostname>`. That breaks Kolla RabbitMQ after a
+# reboot: `rabbit@controller` binds epmd to the management IP (ERL_EPMD_ADDRESS)
+# but the hostname resolves to loopback, so epmd can't connect and every
+# AMQP-dependent service (nova/neutron/cinder/heat) goes unhealthy.
+- name: Stop cloud-init from regenerating /etc/hosts on every boot
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/cloud/cloud.cfg.d/99-disable-manage-etc-hosts.cfg
+    content: "manage_etc_hosts: false\n"
+    mode: '0644'
+
 - name: Ensure that hosts are defined in /etc/hosts
   become: true
   ansible.builtin.lineinfile:
@@ -8,3 +21,12 @@
     create: false
     regexp: '^{{ item.ip }}\s+{{ item.hostname }}$'
   loop: "{{ node_hosts }}"
+
+# The node's hostname must resolve to its management-VLAN IP (added above),
+# not to loopback, or epmd/RabbitMQ fail as described.
+- name: Remove the loopback mapping of the node hostname
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    state: absent

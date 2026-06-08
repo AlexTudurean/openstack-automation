@@ -1,2 +1,5 @@
 .DS_Store
 *.retry
+
+# Dissertation document drops — these belong in the dissertation repo, not here
+*.pdf

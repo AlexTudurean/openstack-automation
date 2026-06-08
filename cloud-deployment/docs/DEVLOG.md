@@ -473,6 +473,23 @@ Automation (`deploy_ingress_nginx.yml`) updated to use `table: raw, chain: PRERO
 
 **Solution**: Added `ansible_host: 192.168.0.10x` per host in the inventory — Ansible SSHes via home network while K3S registers and communicates over the VLAN IPs.
 
+### Challenge 29: VMs Don't Auto-Start After Proxmox Host Reboot — Missing `onboot`
+
+**Problem**: After rebooting the Proxmox host, none of the lab VMs (100–103) came back up; the whole stack stayed down until each VM was started by hand.
+
+**Root cause**: `proxmox-setup.sh` created every VM with `qm create` but never set the `onboot` flag. Proxmox defaults `onboot` to 0, so VMs only run until the next host reboot and then stay stopped. The provisioning succeeded and the lab worked, so the gap was invisible until the first host reboot.
+
+**Fix**: Added `--onboot 1` to both `create_openstack_vm` and `create_portal_vm` in `proxmox-setup.sh`, so future provisioning persists boot-on-start. Because the create functions skip VMs that already exist, the flag does **not** get retrofitted by re-running the script — existing VMs were fixed and started in one pass on the host:
+
+```bash
+for v in 100 101 102 103; do
+  qm set "$v" --onboot 1
+  [ "$(qm status "$v" | awk '{print $2}')" = running ] || qm start "$v"
+done
+```
+
+**Lesson**: `qm create` does not enable autostart by default — VMs meant to survive a host reboot need an explicit `--onboot 1`. Provisioning scripts should set it at create time, and the reboot-recovery loop is documented in `AGENT_RUNBOOK.md` §3.1.
+
 ---
 
 ## Decisions Log

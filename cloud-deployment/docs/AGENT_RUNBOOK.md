@@ -46,12 +46,17 @@ This document tells an AI agent everything it needs to operate, debug, and redep
 
 ## 2. Infrastructure at a glance
 
+Proxmox host (hypervisor): `192.168.0.100` — the LAN gateway is `192.168.0.1`.
+
 | VM | Proxmox ID | IP (LAN) | IP (VLAN) | Role |
 |---|---|---|---|---|
-| controller | 100 | 192.168.0.100 | 10.0.1.2 | OpenStack controller (Kolla) |
-| compute | 101 | 192.168.0.101 | 10.0.1.3 | Nova compute + K3S worker |
-| storage | 102 | 192.168.0.102 | 10.0.1.4 | Rook/Ceph + K3S control-plane |
+| controller | 100 | 192.168.0.101 | 10.0.1.2 | OpenStack controller (Kolla) |
+| compute | 101 | 192.168.0.102 | 10.0.1.3 | Nova compute + K3S worker |
+| storage | 102 | 192.168.0.103 | 10.0.1.4 | Rook/Ceph + K3S control-plane |
 | portal | 103 | 192.168.0.104 | — | Docker Compose: nginx+FastAPI+PG |
+
+All four VMs are created with `--onboot 1`, so they auto-start when the Proxmox
+host reboots (see §3.1 if any come up stopped).
 
 OpenStack VIP: `10.0.1.254` (Keepalived on controller)
 VPN gateway VM (inside OpenStack): floating IP `10.0.2.150`, demo-net `10.0.0.41`
@@ -76,6 +81,29 @@ ssh root@192.168.0.100
 ```
 
 All `ssh` commands need `-o StrictHostKeyChecking=no` on first connection to a host.
+
+---
+
+## 3.1 Proxmox host: VM autostart & reboot recovery
+
+All four lab VMs (100–103) are provisioned with `--onboot 1` by
+`cloud-deployment/lab/proxmox-setup.sh`, so they start automatically when the
+Proxmox host boots, in VMID order (controller first → portal last).
+
+If the host was rebooted and one or more VMs did not come up (e.g. VMs created
+before the `onboot` flag was added), run this **on the Proxmox host as root** —
+it sets `onboot` on every VM and starts any that are stopped:
+
+```bash
+for v in 100 101 102 103; do
+  qm set "$v" --onboot 1
+  [ "$(qm status "$v" | awk '{print $2}')" = running ] || qm start "$v"
+done
+qm list
+```
+
+`proxmox-setup.sh` skips VMs that already exist, so re-running it will **not**
+retrofit `onboot` onto existing VMs — use the loop above for that.
 
 ---
 

@@ -91,6 +91,7 @@ create_openstack_vm() {
     --bios ovmf \
     --scsihw virtio-scsi-pci \
     --net0 "virtio,bridge=vmbr0,trunks=4000;4001;4002" \
+    --onboot 1 \
     --ostype l26
 
   qm set "$VMID" --efidisk0 "${STORAGE}:4,efitype=4m,pre-enrolled-keys=0"
@@ -136,6 +137,7 @@ create_portal_vm() {
     --bios ovmf \
     --scsihw virtio-scsi-pci \
     --net0 "virtio,bridge=vmbr0,trunks=4000" \
+    --onboot 1 \
     --ostype l26
 
   qm set "$VMID" --efidisk0 "${STORAGE}:4,efitype=4m,pre-enrolled-keys=0"

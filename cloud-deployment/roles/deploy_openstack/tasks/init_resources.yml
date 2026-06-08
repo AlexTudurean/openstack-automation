@@ -46,6 +46,7 @@
     --network mgmt-net
     --subnet-range {{ mgmt_net_cidr }}
     --gateway {{ mgmt_net_gateway }}
+    --host-route destination={{ admin_vpn_cidr | default('10.99.0.0/24') }},gateway={{ mgmt_net_gateway }}
     --dns-nameserver 8.8.8.8
   args:
     executable: /bin/bash
@@ -53,6 +54,17 @@
     PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   when: mgmt_subnet_check.rc != 0
   changed_when: true
+
+- name: Ensure mgmt-subnet advertises admin VPN return route
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack subnet set mgmt-subnet
+    --host-route destination={{ admin_vpn_cidr | default('10.99.0.0/24') }},gateway={{ mgmt_net_gateway }}
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  changed_when: false
 
 - name: Check if mgmt-router exists
   ansible.builtin.shell: >
@@ -97,7 +109,7 @@
   ansible.builtin.shell: >
     source /etc/kolla/admin-openrc.sh &&
     {{ kolla_venv_path }}/bin/openstack security group create pool-sg
-    --description "Available dev VMs: SSH accessible from portal only"
+    --description "Available dev VMs: SSH accessible from admin VPN"
   args:
     executable: /bin/bash
   environment:
@@ -105,18 +117,18 @@
   when: pool_sg_check.rc != 0
   changed_when: true
 
-- name: Add SSH rule to pool-sg (portal VM access only)
+- name: Add admin VPN SSH rule to pool-sg (sysadmin out-of-band access over mgmt-net)
   ansible.builtin.shell: >
     source /etc/kolla/admin-openrc.sh &&
     {{ kolla_venv_path }}/bin/openstack security group rule create pool-sg
-    --protocol tcp --dst-port 22 --remote-ip {{ portal_ip }}/32
+    --protocol tcp --dst-port 22 --remote-ip {{ admin_vpn_cidr | default('10.99.0.0/24') }}
   args:
     executable: /bin/bash
   environment:
     PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-  when: pool_sg_check.rc != 0
-  changed_when: true
+  changed_when: pool_sg_admin_rule.rc == 0
   failed_when: false
+  register: pool_sg_admin_rule
 
 - name: Route user VPN tunnel subnet back through vpn-gateway
   ansible.builtin.shell: >

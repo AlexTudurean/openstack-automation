@@ -91,6 +91,12 @@ PersistentKeepalive = 25
 ```
 
 > **`10.0.4.0/24` must be in AllowedIPs** — this is the mgmt-net for direct admin SSH into dev VMs. Proxmox has a static route for it (`post-up ip route add 10.0.4.0/24 via 10.0.2.200` on vmbr1 in `/etc/network/interfaces`), so packets for 10.0.4.x go: Mac → Proxmox → OVN mgmt-router (10.0.2.200) → dev VM mgmt NIC.
+>
+> `mgmt-subnet` must also advertise the return route
+> `10.99.0.0/24 via 10.0.4.1` through DHCP. Otherwise a guest can receive admin
+> VPN traffic on its management NIC but reply through its tenant/default route,
+> causing SSH to connect and then hang during banner or key exchange. Existing
+> VMs need DHCP renewal or a soft reboot after this host route is added.
 
 ### Step 3 — Resources accessible with admin VPN active
 

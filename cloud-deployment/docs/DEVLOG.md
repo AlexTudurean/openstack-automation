@@ -711,7 +711,8 @@ Reserved devservers accepted SSH but sometimes took around 15 seconds to reach t
 - [x] mgmt-net Neutron network added (10.0.4.0/24) — dev VMs get a second NIC; admin can SSH via 10.0.4.x; mgmt-router at fixed external IP 10.0.2.200
 - [x] Static route persisted on Proxmox: `post-up ip route add 10.0.4.0/24 via 10.0.2.200` in vmbr1 block of `/etc/network/interfaces`; baked into `proxmox-setup.sh`
 - [x] Admin WireGuard AllowedIPs updated on Mac to include `10.0.4.0/24` — admin VPN can now reach dev VM mgmt NICs
-- [x] pool-sg security group added — SSH from portal IP (192.168.0.104) only; applied to available VMs in pool
+- [x] pool-sg security group added — SSH from admin VPN CIDR; applied to available VMs in pool
+- [x] pool-sg SSH rules made idempotent — the admin VPN CIDR rule is attempted on every OpenStack init run, not only when `pool-sg` is first created
 - [x] Portal architecture decision: portal VM runs on Proxmox (192.168.0.104) outside OpenStack — eliminates chicken-and-egg dependency on OpenStack health
 - [x] PaaS portal implemented as git submodule at `openstack-automation/portal/`:
   - Backend: FastAPI + SQLAlchemy async + Alembic + APScheduler pool poller

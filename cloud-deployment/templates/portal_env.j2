@@ -18,3 +18,5 @@ MGMT_NET_NAME=mgmt-net
 DEMO_NET_NAME=demo-net
 PUBLIC_NET_NAME=public1
 POOL_POLL_INTERVAL_SECONDS=30
+ADMIN_VPN_CIDR={{ admin_vpn_cidr | default('10.99.0.0/24') }}
+ADMIN_SSH_PUBLIC_KEY={{ admin_ssh_public_key | default('') }}

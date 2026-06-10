@@ -4,6 +4,10 @@
     name: ingress-nginx
     url: https://kubernetes.github.io/ingress-nginx
     kubeconfig: "{{ k8s_kubeconfig }}"
+  register: ingress_nginx_repo
+  until: ingress_nginx_repo is succeeded
+  retries: 3
+  delay: 20
 
 - name: Install ingress-nginx
   kubernetes.core.helm:
@@ -17,6 +21,10 @@
     wait_timeout: "300s"
     update_repo_cache: true
     kubeconfig: "{{ k8s_kubeconfig }}"
+  register: ingress_nginx_helm
+  until: ingress_nginx_helm is succeeded
+  retries: 3
+  delay: 30
 
 - name: Install iptables-persistent
   ansible.builtin.apt:

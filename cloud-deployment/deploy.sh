@@ -6,6 +6,8 @@
 #   ./deploy.sh            — full fresh deploy (safe to re-run except phase 6)
 #   ./deploy.sh --phase N  — run only phase N (1-7)
 set -euo pipefail
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
 trap 'echo "ERROR: Deployment failed at line $LINENO"' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

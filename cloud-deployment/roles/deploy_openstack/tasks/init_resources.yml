@@ -55,6 +55,20 @@
   when: mgmt_subnet_check.rc != 0
   changed_when: true
 
+- name: Check if mgmt-subnet already advertises admin VPN return route
+  ansible.builtin.shell: |
+    source /etc/kolla/admin-openrc.sh
+    ROUTES="$({{ kolla_venv_path }}/bin/openstack subnet show mgmt-subnet -f json -c host_routes)"
+    echo "$ROUTES" | grep -q '"destination": "{{ admin_vpn_cidr | default('10.99.0.0/24') }}"'
+    echo "$ROUTES" | grep -q '"nexthop": "{{ mgmt_net_gateway }}"'
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  register: mgmt_subnet_admin_route_check
+  failed_when: false
+  changed_when: false
+
 - name: Ensure mgmt-subnet advertises admin VPN return route
   ansible.builtin.shell: >
     source /etc/kolla/admin-openrc.sh &&
@@ -64,7 +78,8 @@
     executable: /bin/bash
   environment:
     PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-  changed_when: false
+  when: mgmt_subnet_admin_route_check.rc != 0
+  changed_when: true
 
 - name: Check if mgmt-router exists
   ansible.builtin.shell: >
@@ -130,17 +145,56 @@
   failed_when: false
   register: pool_sg_admin_rule
 
+- name: Discover vpn-gateway demo-net IP
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack server show vpn-gateway -f value -c addresses |
+    sed -n 's/.*demo-net=\([0-9.]\+\).*/\1/p'
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  register: vpn_gateway_demo_ip_live
+  changed_when: false
+  failed_when: false
+
 - name: Route user VPN tunnel subnet back through vpn-gateway
   ansible.builtin.shell: >
     source /etc/kolla/admin-openrc.sh &&
     {{ kolla_venv_path }}/bin/openstack router set demo-router
-    --route destination={{ vpn_gateway_tunnel_subnet }},gateway={{ vpn_gateway_demo_ip }}
+    --route destination={{ vpn_gateway_tunnel_subnet }},gateway={{ vpn_gateway_demo_ip_live.stdout | trim | default(vpn_gateway_demo_ip, true) }}
   args:
     executable: /bin/bash
   environment:
     PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   changed_when: true
   failed_when: false
+
+- name: Check if demo-subnet already advertises user VPN return route
+  ansible.builtin.shell: |
+    source /etc/kolla/admin-openrc.sh
+    ROUTES="$({{ kolla_venv_path }}/bin/openstack subnet show demo-subnet -f json -c host_routes)"
+    echo "$ROUTES" | grep -q '"destination": "{{ vpn_gateway_tunnel_subnet }}"'
+    echo "$ROUTES" | grep -q '"nexthop": "{{ demo_net_gateway }}"'
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  register: demo_subnet_user_route_check
+  failed_when: false
+  changed_when: false
+
+- name: Ensure demo-subnet advertises user VPN return route
+  ansible.builtin.shell: >
+    source /etc/kolla/admin-openrc.sh &&
+    {{ kolla_venv_path }}/bin/openstack subnet set demo-subnet
+    --host-route destination={{ vpn_gateway_tunnel_subnet }},gateway={{ demo_net_gateway }}
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  when: demo_subnet_user_route_check.rc != 0
+  changed_when: true
 
 - name: Print mgmt-net post-deploy info
   ansible.builtin.debug:
@@ -149,4 +203,5 @@
       - "mgmt-router external IP  : {{ mgmt_router_external_ip }}"
       - "Proxmox static route     : ip route add {{ mgmt_net_cidr }} via {{ mgmt_router_external_ip }}"
       - "Admin WireGuard          : add {{ mgmt_net_cidr }} to AllowedIPs"
-      - "User VPN return route    : {{ vpn_gateway_tunnel_subnet }} via {{ vpn_gateway_demo_ip }} on demo-router"
+      - "User VPN return route    : {{ vpn_gateway_tunnel_subnet }} via {{ vpn_gateway_demo_ip_live.stdout | trim | default(vpn_gateway_demo_ip, true) }} on demo-router"
+      - "demo-subnet host route   : {{ vpn_gateway_tunnel_subnet }} via {{ demo_net_gateway }}"

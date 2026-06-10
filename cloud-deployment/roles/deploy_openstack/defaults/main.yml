@@ -37,6 +37,7 @@ vpn_gateway_demo_ip: "10.0.0.41"
 vpn_gateway_wg_port: 51821
 vpn_gateway_tunnel_subnet: "10.99.1.0/24"
 vpn_gateway_routed_subnet: "10.0.0.0/24"
+demo_net_gateway: "10.0.0.1"
 
 mgmt_net_cidr: "10.0.4.0/24"
 mgmt_net_gateway: "10.0.4.1"

@@ -4,6 +4,10 @@
     name: "{{ rook_repo }}"
     url: https://charts.rook.io/release
     kubeconfig: "{{ k8s_kubeconfig }}"
+  register: rook_repo_add
+  until: rook_repo_add is succeeded
+  retries: 3
+  delay: 20
 
 - name: Install Rook operator
   kubernetes.core.helm:
@@ -17,6 +21,10 @@
     wait_timeout: 300s
     update_repo_cache: true
     kubeconfig: "{{ k8s_kubeconfig }}"
+  register: rook_operator_helm
+  until: rook_operator_helm is succeeded
+  retries: 3
+  delay: 30
 
 - name: Copy Rook cluster overrides file
   ansible.builtin.copy:
@@ -40,6 +48,10 @@
     wait: false
     update_repo_cache: true
     kubeconfig: "{{ k8s_kubeconfig }}"
+  register: rook_cluster_helm
+  until: rook_cluster_helm is succeeded
+  retries: 3
+  delay: 30
 
 - name: Wait for CephCluster to be ready (image pull + OSD init can take 20+ min)
   kubernetes.core.k8s_info:

@@ -99,8 +99,8 @@
   loop:
     - "--protocol udp --dst-port {{ vpn_gateway_wg_port }} --remote-ip 0.0.0.0/0"
     - "--protocol tcp --dst-port 22 --remote-ip 10.0.1.0/24"
+    - "--protocol tcp --dst-port 22 --remote-ip {{ portal_ip }}/32"
     - "--protocol tcp --dst-port 22 --remote-ip 10.99.0.0/24"
-  when: sg_check.rc != 0
   changed_when: true
   failed_when: false
 
@@ -181,7 +181,6 @@
     PATH: "{{ kolla_venv_path }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   when: vpn_gateway_port.stdout | length > 0
   changed_when: true
-  failed_when: false
 
 - name: Allocate floating IP for vpn-gateway
   ansible.builtin.shell: >

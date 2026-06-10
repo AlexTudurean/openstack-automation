@@ -2,6 +2,9 @@
 # Ceph pool names used by OpenStack services
 ceph_pools: ["volumes", "images", "backups", "vms"]
 
+# The validation deployment contributes one raw OSD disk from each OpenStack node.
+expected_ceph_osd_count: 3
+
 # Namespace for all Rook Ceph resources
 rook_ceph_namespace: rook-ceph
 

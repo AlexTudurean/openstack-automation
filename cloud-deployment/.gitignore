@@ -1,2 +1,6 @@
 .vault_pass
 *.retry
+
+# Deploy-timing run logs — raw ansible output contains Ceph keyring keys and
+# other secrets; only the transcribed timings belong in the dissertation.
+measurements/

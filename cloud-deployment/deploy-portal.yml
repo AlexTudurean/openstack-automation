@@ -27,17 +27,6 @@
       ansible.builtin.set_fact:
         keystone_admin_password: "{{ keystone_password_raw.stdout }}"
 
-    - name: Read vpn-gateway public key saved during Phase 6
-      ansible.builtin.slurp:
-        src: "~/.cloud-vpn-pubkey"
-      register: vpn_pubkey_file
-      delegate_to: localhost
-      become: false
-
-    - name: Set vpn_gateway_public_key fact
-      ansible.builtin.set_fact:
-        vpn_gateway_public_key: "{{ vpn_pubkey_file.content | b64decode | trim }}"
-
     - name: Read SSH private key that was injected into vpn-gateway
       ansible.builtin.slurp:
         src: /root/.ssh/id_ecdsa
@@ -48,6 +37,19 @@
       ansible.builtin.set_fact:
         vpn_gateway_ssh_private_key: "{{ vpn_gateway_ssh_key_file.content | b64decode }}"
       no_log: true
+
+    - name: Read live vpn-gateway WireGuard public key
+      ansible.builtin.shell: >
+        ssh -o StrictHostKeyChecking=no
+        -i /root/.ssh/id_ecdsa
+        ubuntu@{{ vpn_gateway_floating_ip | default('10.0.2.150') }}
+        'sudo wg show wg0 public-key'
+      register: vpn_gateway_public_key_live
+      changed_when: false
+
+    - name: Set vpn_gateway_public_key fact
+      ansible.builtin.set_fact:
+        vpn_gateway_public_key: "{{ vpn_gateway_public_key_live.stdout | trim }}"
 
 - name: Deploy portal application
   hosts: portal_nodes
@@ -91,6 +93,12 @@
           - "--exclude=.env"
           - "--exclude=certs/"
           - "--exclude=keys/"
+
+    - name: Package chef assets for dev VM bootstrap
+      ansible.builtin.shell: >
+        tar -C {{ portal_app_dir }}/chef
+        -czf {{ portal_app_dir }}/chef/cookbooks.tar.gz
+        cookbooks solo.rb node.json
 
     - name: Create keys directory
       ansible.builtin.file:

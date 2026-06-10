@@ -77,13 +77,36 @@ fi
 # ---------------------------------------------------------------------------
 # Phase 3: Wipe Ceph OSD disks (/dev/sdb on all nodes)
 # VMs use VirtIO SCSI: OS disk = /dev/sda, Ceph OSD disk = /dev/sdb.
-# Wipe partition table + first 100 MB to erase any Ceph superblocks.
+# Wipe partition table, first/last 100 MB, discard when supported, and clear
+# common Ceph BlueStore label offsets. Raw BlueStore metadata can survive a
+# normal wipefs/start-of-disk cleanup, causing Rook to skip the disk as
+# belonging to an older cluster on the next deployment.
 # ---------------------------------------------------------------------------
 if run_phase 3 "Wipe Ceph OSD disks"; then
   for NODE in "$CONTROLLER" "$COMPUTE" "$STORAGE"; do
     log "Wiping /dev/sdb on $NODE..."
-    ssh_node "$NODE" "sudo wipefs -af /dev/sdb && \
-      sudo dd if=/dev/zero of=/dev/sdb bs=1M count=100 2>/dev/null"
+    ssh_node "$NODE" '
+      set -e
+      DEV=/dev/sdb
+      sudo swapoff "$DEV"* 2>/dev/null || true
+      sudo blkdiscard -f "$DEV" 2>/dev/null || true
+      sudo wipefs -af "$DEV" || true
+      sudo sgdisk --zap-all "$DEV" 2>/dev/null || true
+      sudo dd if=/dev/zero of="$DEV" bs=1M count=100 conv=fsync 2>/dev/null
+      SIZE_MB=$(($(sudo blockdev --getsize64 "$DEV") / 1024 / 1024))
+      for OFFSET_MB in 1024 10240 102400 1024000; do
+        if [ "$SIZE_MB" -gt "$OFFSET_MB" ]; then
+          sudo dd if=/dev/zero of="$DEV" bs=1M seek="$OFFSET_MB" count=16 conv=fsync 2>/dev/null
+        fi
+      done
+      SECTORS=$(sudo blockdev --getsz "$DEV")
+      SEEK=$((SECTORS / 2048 - 100))
+      if [ "$SEEK" -gt 0 ]; then
+        sudo dd if=/dev/zero of="$DEV" bs=1M seek="$SEEK" count=100 conv=fsync 2>/dev/null
+      fi
+      sudo partprobe "$DEV" 2>/dev/null || true
+      sudo udevadm settle 2>/dev/null || true
+    '
   done
 fi
 

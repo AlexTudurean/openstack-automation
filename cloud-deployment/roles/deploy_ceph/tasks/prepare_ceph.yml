@@ -8,6 +8,21 @@
     kubeconfig: "{{ k8s_kubeconfig }}"
   register: ceph_toolbox_pod
 
+- name: Wait for expected Ceph OSDs to be up and in
+  kubernetes.core.k8s_exec:
+    namespace: "{{ rook_ceph_namespace }}"
+    pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
+    command: ceph osd stat --format json
+    kubeconfig: "{{ k8s_kubeconfig }}"
+  register: ceph_osd_stat
+  until:
+    - (ceph_osd_stat.stdout | from_json).num_osds | int >= expected_ceph_osd_count
+    - (ceph_osd_stat.stdout | from_json).num_up_osds | int >= expected_ceph_osd_count
+    - (ceph_osd_stat.stdout | from_json).num_in_osds | int >= expected_ceph_osd_count
+  retries: 60
+  delay: 10
+  changed_when: false
+
 - name: Create ceph pools
   kubernetes.core.k8s_exec:
     namespace: "{{ rook_ceph_namespace }}"
@@ -25,7 +40,7 @@
   kubernetes.core.k8s_exec:
     namespace: "{{ rook_ceph_namespace }}"
     pod: "{{ ceph_toolbox_pod.resources[0].metadata.name }}"
-    command: rbd pool init {{ item }}
+    command: timeout 60 rbd pool init {{ item }}
     kubeconfig: "{{ k8s_kubeconfig }}"
   loop: "{{ ceph_pools }}"
   register: rbd_init_result

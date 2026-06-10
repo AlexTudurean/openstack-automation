@@ -537,6 +537,29 @@ done
 
 ---
 
+### Challenge 34: SSH to Dev VMs Over the User Tunnel Hangs at KEX — MTU Black Hole
+
+**Problem**: Connecting to a dev VM through the user WireGuard tunnel almost always hung and timed out, working only very rarely. `ssh -vvv` froze right after `debug3: send packet: type 30` / `debug1: expecting SSH2_MSG_KEX_ECDH_REPLY`. The TCP connect, banner, and `KEXINIT` (all small packets) succeeded; the first *large* packet — the server's `KEX_ECDH_REPLY` carrying the host key + signature, inflated by the `sntrup761x25519` post-quantum KEX — never arrived. Classic "small packets pass, large packets vanish" PMTU black-hole signature.
+
+**Root cause**: `global_physnet_mtu` was left at the Neutron default of **1500**, but the data-plane VLAN that carries VXLAN tunnel traffic (`network_interface: eth0.4000`, set to **1400** MTU in `host_vars/*.yaml`) is only 1400. Neutron therefore handed every VXLAN tenant network (`demo-net`, `mgmt-net`) an MTU of **1450** (1500 − 50 VXLAN). A full 1450-byte tenant frame becomes **1500** after the 50-byte VXLAN header — too big for the 1400-MTU underlay VLAN — so it was silently dropped *inside the cloud*. Every packet in the ~1351–1450-byte window vanished; ICMP frag-needed was blackholed too, so PMTUD never recovered. The existing gateway `TCPMSS --clamp-mss-to-pmtu` rule didn't save us because it clamps to the gateway port's MTU (1450, also wrong) and only in the `wg0→ens3` direction.
+
+**Fix** (defence in depth, all in automation):
+1. **Root cause** — set `global_physnet_mtu: 1400` in `globals.yml` to match the real underlay. Neutron now derives VXLAN tenant MTU = 1400 − 50 = **1350**, which fits the 1400 VLAN with headroom. Keep this equal to the `eth0.40xx` MTU in host_vars (and never above the parent `eth0` MTU of 1500).
+2. **Gateway backstop** — made the `TCPMSS` clamp **bidirectional** in `vpn_gateway_userdata.j2` (added the `ens3→wg0` direction) so forwarded SSH SYN/SYN-ACKs are clamped to path MTU regardless of which side initiates.
+3. **Client config** — `wireguard.build_client_config()` in the portal now emits `MTU = 1350` in the `[Interface]` block, so a client's advertised TCP MSS alone keeps the server's large packets under the tightest hop — fixes the tunnel even before the infra-side change lands.
+
+**Live rollout** (existing cloud, requires explicit approval — in-place mutation of shared networks):
+- `openstack network set --mtu 1350 demo-net mgmt-net` — existing tenant nets (new pool VMs pick it up immediately; already-running VMs on next reboot / DHCP-lease renewal).
+- Redeploy portal backend so newly-issued WireGuard configs carry the `MTU` line.
+- Already-issued client configs: add `MTU = 1350` to the `[Interface]` block by hand (confirmed working as a live unblock).
+- Full `kolla-ansible reconfigure` persists `global_physnet_mtu` for any future networks; lands automatically on the next strip-and-redeploy validation run.
+
+**Lesson**: whenever the underlay isn't a clean 1500 (VLAN sub-interfaces, nested tunnels), Neutron's `global_physnet_mtu` **must** be pinned to the real interface MTU. Leaving it at the 1500 default silently over-sizes every overlay tenant network and creates an intermittent black hole that looks like an auth/routing bug. `ssh -vvv` hanging at `expecting SSH2_MSG_KEX_ECDH_REPLY` is an MTU symptom, not an SSH one.
+
+> Note: the data-plane is ML2/**openvswitch + VXLAN** (`br-tun`, `vxlan_sys_4789`, hybrid `qbr/qvo` bridges), not OVN — the stack table above predates this and should be read as openvswitch.
+
+---
+
 ## Decisions Log
 
 **Why Proxmox instead of bare KVM/libvirt?**

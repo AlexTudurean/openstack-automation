@@ -13,8 +13,13 @@ write_files:
       ListenPort = {{ vpn_gateway_wg_port }}
       PrivateKey = {{ wg_server_private_key }}
 
-      PostUp   = iptables -A FORWARD -i wg0 -o ens3 -d {{ vpn_gateway_routed_subnet }} -j ACCEPT; iptables -A FORWARD -i ens3 -o wg0 -s {{ vpn_gateway_routed_subnet }} -j ACCEPT
-      PostDown = iptables -D FORWARD -i wg0 -o ens3 -d {{ vpn_gateway_routed_subnet }} -j ACCEPT; iptables -D FORWARD -i ens3 -o wg0 -s {{ vpn_gateway_routed_subnet }} -j ACCEPT
+      # TCPMSS clamp in BOTH directions: tenant VMs sit behind an OpenStack
+      # VXLAN net (1350 MTU); clamping every forwarded SYN/SYN-ACK to the path
+      # MTU stops large packets (e.g. the SSH KEX_ECDH_REPLY) being blackholed
+      # regardless of what either endpoint advertises. Backstop to the correct
+      # global_physnet_mtu in globals.yml.
+      PostUp   = iptables -A FORWARD -i wg0 -o ens3 -d {{ vpn_gateway_routed_subnet }} -j ACCEPT; iptables -A FORWARD -i ens3 -o wg0 -s {{ vpn_gateway_routed_subnet }} -j ACCEPT; iptables -t mangle -A FORWARD -i wg0 -o ens3 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu; iptables -t mangle -A FORWARD -i ens3 -o wg0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+      PostDown = iptables -D FORWARD -i wg0 -o ens3 -d {{ vpn_gateway_routed_subnet }} -j ACCEPT; iptables -D FORWARD -i ens3 -o wg0 -s {{ vpn_gateway_routed_subnet }} -j ACCEPT; iptables -t mangle -D FORWARD -i wg0 -o ens3 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu; iptables -t mangle -D FORWARD -i ens3 -o wg0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
   - path: /etc/dnsmasq.d/vpn-gateway.conf
     content: |

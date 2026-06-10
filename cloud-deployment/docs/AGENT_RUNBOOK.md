@@ -169,6 +169,23 @@ Two separate WireGuard interfaces exist:
 
 The admin VPN must be active whenever you SSH to 10.0.1.x or access the OpenStack API.
 
+### SSH over the user tunnel hangs / times out (MTU)
+
+If SSH to a dev VM over the user tunnel hangs (with `ssh -vvv` freezing at
+`expecting SSH2_MSG_KEX_ECDH_REPLY`), it is an **MTU black hole**, not auth.
+The VXLAN tenant nets must have MTU **1350** (1400 underlay − 50 VXLAN); if a
+net shows 1450 the underlay-MTU mismatch silently drops large packets. See
+DEVLOG Challenge 34. Checklist:
+
+- `openstack network show demo-net -f value -c mtu` → must be **1350** (not 1450).
+  Fix: `openstack network set --mtu 1350 demo-net mgmt-net` (new VMs pick it up
+  at once; running VMs on reboot / DHCP renewal).
+- `global_physnet_mtu: 1400` must be set in `globals.yml` (matches `eth0.40xx`
+  MTU in host_vars) so fresh deploys are correct.
+- Client `.conf` `[Interface]` block must contain `MTU = 1350` (portal emits this
+  automatically; add by hand to older configs). This alone unblocks SSH even if
+  the network MTU hasn't been corrected yet.
+
 ---
 
 ## 7. Full platform redeploy (all phases)
